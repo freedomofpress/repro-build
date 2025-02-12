@@ -1,0 +1,13 @@
+FROM archlinux:base-20230723.0.166908
+RUN \
+  --mount=type=cache,target=/var/cache/pacman,sharing=locked \
+  --mount=type=bind,source=./repro-sources-list.sh,target=/usr/local/bin/repro-sources-list.sh \
+  repro-sources-list.sh && \
+  pacman -Sy && \
+  pacman -Su --noconfirm gcc
+
+# Note: the following files in the image are not reproducible:
+# etc/pacman.d/gnupg/trustdb.gpg
+# var/cache/ldconfig/aux-cache
+# var/lib/pacman/local/*/desc
+# var/log/pacman.log
