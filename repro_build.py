@@ -2,13 +2,14 @@
 
 import argparse
 import datetime
+import hashlib
 import logging
 import os
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
-import shlex
 
 from pathlib import Path
 
@@ -39,11 +40,11 @@ MSG_BUILD_CTX = """Build parameters:
 """
 
 
-def run(cmd, dry=False):
+def run(cmd, dry=False, check=True):
     action = "Would have run" if dry else "Running"
     logger.debug(f"{action} : {shlex.join(cmd)}")
     if not dry:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=check)
 
 
 def detect_container_runtime() -> str:
@@ -309,7 +310,44 @@ def docker_build(
     buildx_args: list,
     dry: bool,
 ):
-    pass
+    h = hashlib.sha256()
+    h.update(buildkit_image.encode())
+    builder_id = h.hexdigest()
+    builder_name = f"repro-build-{builder_id}"
+    tag_args = f",name={tag}" if tag else ""
+    cache_args = [] if use_cache else ["--no-cache", "--pull"]
+
+    cmd = [
+        "docker",
+        "buildx",
+        "create",
+        "--name",
+        builder_name,
+        "--driver-opt",
+        f"image={buildkit_image}",
+    ]
+    run(cmd, dry, check=False)
+
+    dockerfile_args = ["-f", dockerfile] if dockerfile else []
+
+    cmd = [
+        "docker",
+        "buildx",
+        "--builder",
+        builder_name,
+        "build",
+        "--build-arg",
+        f"SOURCE_DATE_EPOCH={sde}",
+        "--provenance",
+        "false",
+        "--output",
+        f"type=image,rewrite_timestamp=true{tag_args}",
+        *cache_args,
+        *dockerfile_args,
+        *buildx_args,
+        context,
+    ]
+    run(cmd, dry)
 
 
 def main() -> None:
