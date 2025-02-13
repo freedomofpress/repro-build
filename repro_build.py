@@ -9,7 +9,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
 
 from pathlib import Path
 
@@ -35,6 +34,7 @@ MSG_BUILD_CTX = """Build parameters:
 - Build context: {context}
 - Dockerfile: {dockerfile}
 - Tag: {tag}
+- Output: {output}
 - Buildkit arguments: {buildkit_args}
 - Docker Buildx arguments: {buildx_args}
 """
@@ -189,6 +189,13 @@ def parse_args() -> dict:
         help="Pathname of a Dockerfile",
     )
     parser.add_argument(
+        "-o",
+        "--output",
+        metavar="FILE",
+        default=Path.cwd() / "image.tar",
+        help="Path to save OCI tarball",
+    )
+    parser.add_argument(
         "-t",
         "--tag",
         metavar="TAG",
@@ -229,6 +236,7 @@ def podman_build(
     sde: int,
     rootless: bool,
     use_cache: bool,
+    output: str,
     buildkit_args: list,
     dry: bool,
 ):
@@ -265,41 +273,39 @@ def podman_build(
             "type=local,src=/tmp/cache",
         ]
 
-    # TODO: Add cache args, and cache dir
-    with tempfile.TemporaryDirectory() as d:
-        cmd = [
-            "podman",
-            "run",
-            "-it",
-            "--rm",
-            "-v",
-            "buildkit_cache:/tmp/cache",
-            "-v",
-            f"{d}:/tmp/image",
-            "-v",
-            f"{context}:/tmp/work",
-            "--entrypoint",
-            "buildctl-daemonless.sh",
-            *rootless_args,
-            *rootful_args,
-            *dockerfile_args_podman,
-            buildkit_image,
-            "build",
-            "--frontend",
-            "dockerfile.v0",
-            "--local",
-            "context=/tmp/work",
-            "--opt",
-            f"build-arg:SOURCE_DATE_EPOCH={sde}",
-            "--output",
-            f"type=oci,dest=/tmp/image/image.tar,rewrite_timestamp=true{tag_args}",
-            *cache_args,
-            *dockerfile_args_buildkit,
-            *buildkit_args,
-        ]
+    cmd = [
+        "podman",
+        "run",
+        "-it",
+        "--rm",
+        "-v",
+        "buildkit_cache:/tmp/cache",
+        "-v",
+        f"{Path(output).parent}:/tmp/image",
+        "-v",
+        f"{context}:/tmp/work",
+        "--entrypoint",
+        "buildctl-daemonless.sh",
+        *rootless_args,
+        *rootful_args,
+        *dockerfile_args_podman,
+        buildkit_image,
+        "build",
+        "--frontend",
+        "dockerfile.v0",
+        "--local",
+        "context=/tmp/work",
+        "--opt",
+        f"build-arg:SOURCE_DATE_EPOCH={sde}",
+        "--output",
+        f"type=oci,dest=/tmp/image/{Path(output).name},rewrite-timestamp=true{tag_args}",
+        *cache_args,
+        *dockerfile_args_buildkit,
+        *buildkit_args,
+    ]
 
-        run(cmd, dry)
-        run(["podman", "load", "-i", str(Path(d) / "image.tar")])
+    run(cmd, dry)
+    run(["podman", "load", "-i", output])
 
 
 def docker_build(
@@ -309,6 +315,7 @@ def docker_build(
     buildkit_image: str,
     sde: int,
     use_cache: bool,
+    output: str,
     buildx_args: list,
     dry: bool,
 ):
@@ -343,7 +350,7 @@ def docker_build(
         "--provenance",
         "false",
         "--output",
-        "type=image,rewrite_timestamp=true",
+        f"type=oci,dest={output},rewrite-timestamp=true",
         *cache_args,
         *tag_args,
         *dockerfile_args,
@@ -351,6 +358,7 @@ def docker_build(
         context,
     ]
     run(cmd, dry)
+    run(["docker", "load", "-i", output])
 
 
 def main() -> None:
@@ -370,6 +378,7 @@ def main() -> None:
     buildx_args = parse_buildx_args(args, runtime)
     tag = args.tag
     dockerfile = parse_path(args.file)
+    output = parse_path(args.output)
     dry = args.dry
     context = parse_path(args.context)
 
@@ -383,6 +392,7 @@ def main() -> None:
             context=context,
             dockerfile=dockerfile or "(not provided)",
             tag=tag or "(not provided)",
+            output=output,
             buildkit_args=" ".join(buildkit_args) or "(not provided)",
             buildx_args=" ".join(buildx_args) or "(not provided)",
         )
@@ -397,6 +407,7 @@ def main() -> None:
                 buildkit_image,
                 sde,
                 use_cache,
+                output,
                 buildx_args,
                 dry,
             )
@@ -409,6 +420,7 @@ def main() -> None:
                 sde,
                 rootless,
                 use_cache,
+                output,
                 buildkit_args,
                 dry,
             )
