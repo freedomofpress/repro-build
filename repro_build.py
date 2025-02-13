@@ -72,7 +72,9 @@ def parse_runtime(args) -> str:
 
 
 def parse_use_cache(args) -> bool:
-    return not args.no_cache or bool(int(os.environ.get(ENV_CACHE, "1")))
+    if args.no_cache:
+        return False
+    return bool(int(os.environ.get(ENV_CACHE, "1")))
 
 
 def parse_rootless(args, runtime: str) -> bool:
