@@ -351,6 +351,7 @@ def docker_build(
         "false",
         "--output",
         f"type=oci,dest={output},rewrite-timestamp=true",
+        "--load",
         *cache_args,
         *tag_args,
         *dockerfile_args,
@@ -358,7 +359,6 @@ def docker_build(
         context,
     ]
     run(cmd, dry)
-    run(["docker", "load", "-i", output])
 
 
 def main() -> None:
