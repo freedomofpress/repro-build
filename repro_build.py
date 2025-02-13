@@ -316,7 +316,7 @@ def docker_build(
     h.update(buildkit_image.encode())
     builder_id = h.hexdigest()
     builder_name = f"repro-build-{builder_id}"
-    tag_args = f",name={tag}" if tag else ""
+    tag_args = ["-t", tag] if tag else []
     cache_args = [] if use_cache else ["--no-cache", "--pull"]
 
     cmd = [
@@ -343,8 +343,9 @@ def docker_build(
         "--provenance",
         "false",
         "--output",
-        f"type=image,rewrite_timestamp=true{tag_args}",
+        "type=image,rewrite_timestamp=true",
         *cache_args,
+        *tag_args,
         *dockerfile_args,
         *buildx_args,
         context,
