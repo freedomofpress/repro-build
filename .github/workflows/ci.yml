@@ -6,29 +6,40 @@ on:
   workflow_dispatch:
   push:
 
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/repro-build/debian-12
+
 jobs:
   local-build:
-    name: Reproducibly build image in ubuntu-${{ matrix.variant }} using ${{ matrix.extra.runtime }}
+    name: ubuntu-${{ matrix.version }}${{ matrix.arch.suffix }} / ${{ matrix.runtime }} / ${{ matrix.buildkit.desc }}
     strategy:
+      fail-fast: false
       matrix:
-        variant:
+        version:
           - "24.04"
           - "22.04"
+        arch:
+          - suffix: ""
+            name: "amd64"
+            digest: "sha256:b0088ba0110c2acfe757eaf41967ac09fe16e96a8775b998577f86d90b3dbe53"
+          - suffix: "-arm"
+            name: "arm64"
+            digest: "sha256:321b97a58f703cc2faac96fd6b107058c60e010306786fe3417eae0d6cc862f9"
         buildkit:
-          - "docker.io/moby/buildkit:v19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
-          - "docker.io/moby/buildkit:latest"
-        extra:
-          - runtime: "docker"
-            args: --buildx-args "--platform linux/amd64,linux/arm64"
-          - runtime: "podman"
-            args: --buildkit-args "--opt platform=linux/amd64,linux/arm64"
-    runs-on: ubuntu-${{ matrix.variant }}
+          - image: "docker.io/moby/buildkit:v19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
+            desc: "Buildkit (v0.19.0)"
+          - image: "docker.io/moby/buildkit:latest"
+            desc: "Buildkit (latest)"
+        runtime:
+          - "docker"
+          - "podman"
+    runs-on: ubuntu-${{ matrix.version}}${{ matrix.arch.suffix }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Intall Podman
-        if: matrix.extra.runtime == 'podman'
+      - name: Install Podman
+        if: matrix.runtime == 'podman'
         run: |
           sudo apt update
           sudo apt install -y podman
@@ -37,14 +48,15 @@ jobs:
         run: |
           sudo ./repro-build build  \
             --buildkit-image \
-            ${{ matrix.buildkit }} \
+            ${{ matrix.buildkit.image }} \
             --source-date-epoch \
             1677619260 \
             --runtime \
-            ${{ matrix.extra.runtime }} \
-            ${{ matrix.extra.args }} \
+            ${{ matrix.runtime }} \
+            --platform \
+            linux/${{ matrix.arch.name }} \
             -t \
-            image:latest \
+            ${{ env.IMAGE_NAME }} \
             -f \
             Dockerfile.debian-12 \
             .
@@ -52,21 +64,34 @@ jobs:
       - name: Verify digest
         run: |
           ./repro-build analyze \
+            --show-contents \
             --expected-image-digest \
-            sha256:fab23b1d46130ff2086e95f412c9604204bdff3b41d5ca0cacbe564887bb5075 \
+            ${{ matrix.arch.digest }} \
             image.tar
 
   actions-build:
-    name: Reproducibly build image in ubuntu-${{ matrix.variant }} using Docker Buildx action
-    runs-on: ubuntu-latest
+    name: ubuntu-${{ matrix.version }}${{ matrix.arch.suffix }} / Docker GHA / ${{ matrix.buildkit.desc }}
+    runs-on: ubuntu-${{ matrix.version}}${{ matrix.arch.suffix }}
     strategy:
+      fail-fast: false
       matrix:
-        variant:
+        version:
           - "24.04"
           - "22.04"
+        arch:
+          - suffix: ""
+            name: "amd64"
+            digest: "sha256:b0088ba0110c2acfe757eaf41967ac09fe16e96a8775b998577f86d90b3dbe53"
+          - suffix: "-arm"
+            name: "arm64"
+            digest: "sha256:321b97a58f703cc2faac96fd6b107058c60e010306786fe3417eae0d6cc862f9"
         buildkit:
-          - "docker.io/moby/buildkit:v19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
-          - "docker.io/moby/buildkit:latest"
+          - image: "docker.io/moby/buildkit:v19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
+            desc: "Buildkit (v0.19.0)"
+            short: bk0.19.0
+          - image: "docker.io/moby/buildkit:latest"
+            desc: "Buildkit (latest)"
+            short: bkl
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -74,20 +99,53 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          driver-opts: image=${{ matrix.buildkit }}
+          driver-opts: image=${{ matrix.buildkit.image }}
 
       - name: Build image
         uses: docker/build-push-action@v6
         with:
           provenance: false
           build-args: SOURCE_DATE_EPOCH=1677619260
-          outputs: type=oci,dest=image.tar,name=image:latest,rewrite-timestamp=true
-          platforms: linux/amd64,linux/arm64
+          outputs: type=docker,dest=image.tar,name=${{ env.IMAGE_NAME }},rewrite-timestamp=true
+          platforms: linux/${{ matrix.arch.name }}
           file: Dockerfile.debian-12
 
       - name: Verify digest
         run: |
           ./repro-build analyze \
+            --show-contents \
             --expected-image-digest \
-            sha256:fab23b1d46130ff2086e95f412c9604204bdff3b41d5ca0cacbe564887bb5075 \
+            ${{ matrix.arch.digest }} \
             image.tar
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate image name
+        id: image
+        run: |
+          date=$(date +'%Y%m%d')
+          tag="${date}-${{ matrix.version }}${{ matrix.arch.suffix }}-${{ matrix.buildkit.short }}-${RANDOM}"
+          name=${{ env.IMAGE_NAME }}:${tag}
+          echo "Will use image name: ${name}"
+          echo "name=$name" >> $GITHUB_OUTPUT
+
+      - name: Push image
+        uses: docker/build-push-action@v6
+        with:
+          provenance: false
+          build-args: SOURCE_DATE_EPOCH=1677619260
+          outputs: type=registry,name=${{ steps.image.outputs.name }},rewrite-timestamp=true
+          platforms: linux/${{ matrix.arch.name }}
+          file: Dockerfile.debian-12
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ steps.image.outputs.name }}
+          digest=$(docker buildx imagetools inspect ${{ steps.image.outputs.name }} --format "{{json .Manifest}}" | jq -r '.digest')
+          echo "Digest is: ${digest}"
+          [[ "$digest" = "${{ matrix.arch.digest }}" ]]
