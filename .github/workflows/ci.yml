@@ -28,8 +28,11 @@ jobs:
         buildkit:
           - image: "docker.io/moby/buildkit:v19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
             desc: "Buildkit (v0.19.0)"
-          - image: "docker.io/moby/buildkit:latest"
-            desc: "Buildkit (latest)"
+          # FIXME: Re-enable this option once
+          # https://github.com/moby/buildkit/issues/5774 is fixed
+          #
+          #- image: "docker.io/moby/buildkit:latest"
+          #  desc: "Buildkit (latest)"
         runtime:
           - "docker"
           - "podman"
@@ -89,9 +92,12 @@ jobs:
           - image: "docker.io/moby/buildkit:v19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
             desc: "Buildkit (v0.19.0)"
             short: bk0.19.0
-          - image: "docker.io/moby/buildkit:latest"
-            desc: "Buildkit (latest)"
-            short: bkl
+          # FIXME: Re-enable this option once
+          # https://github.com/moby/buildkit/issues/5774 is fixed
+          #
+          #- image: "docker.io/moby/buildkit:latest"
+          #  desc: "Buildkit (latest)"
+          #  short: bkl
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
