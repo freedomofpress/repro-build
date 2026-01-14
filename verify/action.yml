@@ -1,0 +1,90 @@
+name: 'Reproduce and Verify'
+description: 'Reproduce a container image and verify its digest using repro-build script'
+inputs:
+  image_name:
+    description: 'Name of the image'
+    required: true
+  expected_digest:
+    description: 'Expected image digest (e.g., sha256:...) '
+    required: true
+  file:
+    description: 'Path to the Dockerfile'
+    required: false
+    default: 'Dockerfile'
+  context:
+    description: 'Build context'
+    required: false
+    default: '.'
+  architecture:
+    description: 'Target architecture (e.g., linux/amd64)'
+    required: false
+    default: 'linux/amd64'
+  buildkit_version:
+    description: 'BuildKit version (e.g., v0.19.0) or "latest"'
+    required: false
+    default: 'latest'
+  runtime:
+    description: 'Container runtime (docker or podman)'
+    required: false
+    default: 'docker'
+  source_date_epoch:
+    description: 'SOURCE_DATE_EPOCH value'
+    required: false
+    default: '1677619260'
+  build_args:
+    description: 'Additional build arguments (comma-separated ARG=VALUE)'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Prepare BuildKit image
+      id: buildkit
+      shell: bash
+      run: |
+        BK_VER="${{ inputs.buildkit_version }}"
+        if [[ "$BK_VER" == "latest" ]]; then
+          echo "image=docker.io/moby/buildkit:latest" >> $GITHUB_OUTPUT
+        elif [[ "$BK_VER" == "v0.19.0" ]]; then
+          echo "image=docker.io/moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe" >> $GITHUB_OUTPUT
+        else
+          echo "image=$BK_VER" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Reproduce image
+      shell: bash
+      run: |
+        REPRO_SCRIPT="${{ github.action_path }}/../../repro-build"        
+        # Split build_args by comma
+        IFS=',' read -ra ADDR <<< "${{ inputs.build_args }}"
+        BA_ARGS=()
+        for i in "${ADDR[@]}"; do
+          if [[ -n "$i" ]]; then
+            BA_ARGS+=("--build-arg" "$i")
+          fi
+        done
+
+        sudo python3 "$REPRO_SCRIPT" build \
+          --runtime "${{ inputs.runtime }}" \
+          --buildkit-image "${{ steps.buildkit.outputs.image }}" \
+          --source-date-epoch "${{ inputs.source_date_epoch }}" \
+          --platform "${{ inputs.architecture }}" \
+          -t "${{ inputs.image_name }}" \
+          -f "${{ inputs.file }}" \
+          -o "image.tar" \
+          "${{ BA_ARGS[@] }}" \
+          "${{ inputs.context }}"
+
+    - name: Verify digest
+      shell: bash
+      run: |
+        REPRO_SCRIPT="${{ github.action_path }}/../../repro-build"
+        python3 "$REPRO_SCRIPT" analyze \
+          --show-contents \
+          --expected-image-digest "${{ inputs.expected_digest }}" \
+          "image.tar"
