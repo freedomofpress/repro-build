@@ -1,9 +1,6 @@
 name: 'Reproduce and Verify'
 description: 'Reproduce a container image and verify its digest using repro-build script'
 inputs:
-  image_name:
-    description: 'Name of the image'
-    required: true
   expected_digest:
     description: 'Expected image digest (e.g., sha256:...) '
     required: true
@@ -43,23 +40,10 @@ runs:
       with:
         python-version: '3.x'
 
-    - name: Prepare BuildKit image
-      id: buildkit
-      shell: bash
-      run: |
-        BK_VER="${{ inputs.buildkit_version }}"
-        if [[ "$BK_VER" == "latest" ]]; then
-          echo "image=docker.io/moby/buildkit:latest" >> $GITHUB_OUTPUT
-        elif [[ "$BK_VER" == "v0.19.0" ]]; then
-          echo "image=docker.io/moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe" >> $GITHUB_OUTPUT
-        else
-          echo "image=$BK_VER" >> $GITHUB_OUTPUT
-        fi
-
     - name: Reproduce image
       shell: bash
       run: |
-        REPRO_SCRIPT="${{ github.action_path }}/../../repro-build"        
+        REPRO_SCRIPT="${{ github.action_path }}/../../repro-build"
         # Split build_args by comma
         IFS=',' read -ra ADDR <<< "${{ inputs.build_args }}"
         BA_ARGS=()

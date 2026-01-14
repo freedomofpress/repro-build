@@ -101,8 +101,8 @@ runs:
           echo "value=${{ inputs.source_date_epoch }}" >> "$GITHUB_OUTPUT"
         elif [ -n "${{ inputs.timestamp }}" ]; then
           echo "Translating timestamp to Unix epoch: ${{ inputs.timestamp }}"
-          # date -d is GNU date, works for RFC 3339. %s is seconds since epoch.
-          EPOCH=$(date -d "${{ inputs.timestamp }}" +%s)
+          # date -u -d is GNU date, works for RFC 3339. %s is seconds since epoch.
+          EPOCH=$(date -u -d "${{ inputs.timestamp }}" +%s)
           echo "Translated value: $EPOCH"
           echo "value=$EPOCH" >> "$GITHUB_OUTPUT"
         else
