@@ -25,6 +25,7 @@ inputs:
   push:
     description: "Whether to push to registry"
     required: false
+    default: false
   outputs:
     description: "List of output destinations"
     required: false
@@ -44,9 +45,11 @@ inputs:
   cache-from:
     description: "List of external cache sources"
     required: false
+    default: "type=gha"
   cache-to:
     description: "List of external cache destinations"
     required: false
+    default: "type=gha,mode=max"
   cache-map:
     description: "Mapping of host paths to container paths for caching"
     required: false
@@ -65,12 +68,15 @@ inputs:
   no-cache:
     description: "Do not use cache when building the image"
     required: false
+    default: false
   pull:
     description: "Always attempt to pull a newer version of the image"
     required: false
+    default: false
   sbom:
     description: "Generate SBOM attestation"
     required: false
+    default: false
 
 outputs:
   imageid:
@@ -152,8 +158,8 @@ runs:
         annotations: ${{ inputs.annotations }}
         provenance: false
         sbom: ${{ inputs.sbom }}
-        cache-from: ${{ inputs.cache-from || (inputs.cache && "type=gha" || "") }}
-        cache-to: ${{ inputs.cache-to || (inputs.cache && "type=gha,mode=max" || "") }}
+        cache-from: ${{ inputs.cache-from }}
+        cache-to: ${{ inputs.cache-to }}
         build-args: |
           SOURCE_DATE_EPOCH=${{ steps.epoch.outputs.value }}
           ${{ inputs.build-args }}
