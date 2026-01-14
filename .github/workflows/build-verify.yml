@@ -11,8 +11,8 @@ env:
 
 jobs:
   repro-build-push:
-    name: ubuntu-${{ matrix.version }}${{ matrix.arch.suffix }} / Docker GHA / ${{ matrix.buildkit.desc }}
-    runs-on: ubuntu-${{ matrix.version}}${{ matrix.arch.suffix }}
+    name: ${{ matrix.image.distro }} / ${{ matrix.image.base }}
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
