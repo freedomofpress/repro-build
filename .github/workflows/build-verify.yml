@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
   push:
 
+permissions:
+  packages: write
+
 env:
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/repro-build
 
@@ -32,10 +35,18 @@ jobs:
         run: |
           ARCHIVE_DATE=$(date -u +'%Y%m%d')
           SOURCE_DATE_EPOCH=$(date -u -d ${ARCHIVE_DATE} +"%s")
-          TAG=${{ matrix.image.version }}-${ARCHIVE_DATE}
+          IMAGE=${{ env.IMAGE_PREFIX }}/${{ matrix.image.distro }}
+          TAG=${IMAGE}:${{ matrix.image.version }}-${ARCHIVE_DATE}
           echo "archive_date=${DEBIAN_ARCHIVE_DATE}" >> $GITHUB_OUTPUT
           echo "source_date_epoch=${SOURCE_DATE_EPOCH}" >> $GITHUB_OUTPUT
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Reproducibly build image
         uses: freedomofpress/repro-build@rewrite

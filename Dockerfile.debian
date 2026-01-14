@@ -1,6 +1,6 @@
-ARG DEBIAN_IMAGE_TAG
+ARG DEBIAN_IMAGE_TAG=trixie-20260112-slim
 
-FROM docker.io/library/debian:{DEBIAN_IMAGE_TAG}
+FROM docker.io/library/debian:${DEBIAN_IMAGE_TAG}
 
 ENV DEBIAN_FRONTEND=noninteractive
 ARG SOURCE_DATE_EPOCH
@@ -10,6 +10,7 @@ RUN \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   --mount=type=bind,source=./repro-sources-list.sh,target=/usr/local/bin/repro-sources-list.sh \
   repro-sources-list.sh && \
-  apt-get update && apt-get upgrade -y \
+  apt-get update && \
+  apt-get upgrade -y && \
   : "Clean up for improving reproducibility (optional)" && \
   rm -rf /var/log/* /var/cache/ldconfig/aux-cache
