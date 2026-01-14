@@ -77,6 +77,10 @@ inputs:
     description: "Generate SBOM attestation"
     required: false
     default: false
+  no-setup-buildx:
+    description: "Whether to skip the buildx setup step"
+    required: false
+    default: false
 
 outputs:
   imageid:
@@ -93,7 +97,11 @@ runs:
   using: "composite"
   steps:
     - name: "Set up Docker Buildx"
-      if: ${{ inputs.buildkit_image }}
+      if: ${{ inputs.no-setup-buildx != 'true' && inputs.buildkit_image == '' }}
+      uses: "docker/setup-buildx-action@v3"
+
+    - name: "Set up Docker Buildx (with driver-opts)"
+      if: ${{ inputs.no-setup-buildx != 'true' && inputs.buildkit_image != '' }}
       uses: "docker/setup-buildx-action@v3"
       with:
         driver-opts: "image=${{ inputs.buildkit_image }}"
