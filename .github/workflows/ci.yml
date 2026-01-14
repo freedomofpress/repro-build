@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
-  push:
+  #push:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/repro-build/debian-12
