@@ -12,5 +12,8 @@ RUN \
   repro-sources-list.sh && \
   apt-get update && \
   apt-get upgrade -y && \
+  : "Hacky way to set a date for the Debian snapshot repos" && \
+  touch -d @${SOURCE_DATE_EPOCH} /etc/apt/sources.list.d/debian.sources && \
+  touch -d @${SOURCE_DATE_EPOCH} /etc/apt/sources.list && \
   : "Clean up for improving reproducibility (optional)" && \
   rm -rf /var/log/* /var/cache/ldconfig/aux-cache
