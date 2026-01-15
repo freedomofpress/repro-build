@@ -1,5 +1,19 @@
 # repro-build
 
+- [How it works](#how-it-works)
+- [Features](#features)
+- [Reproducible images in this repository](#reproducible-images-in-this-repository)
+- [Usage](#usage)
+  - [Build a container image locally](#build-a-container-image-locally)
+  - [Build a container image on GitHub Actions](#build-a-container-image-on-github-actions)
+  - [Analyze a container image in .tar format](#analyze-a-container-image-in-tar-format)
+- [Tarball format](#tarball-format)
+- [Multi-platform images](#multi-platform-images)
+- [Sources of non-determinism](#sources-of-non-determinism)
+- [Other considerations](#other-considerations)
+- [Read more](#read-more)
+- [Credits](#credits)
+
 `repro-build` is a script that helps you build bit-for-bit reproducible
 containers. By "reproducible containers", we refer to container images which can
 be rebuilt at any time, anywhere, from the same **Dockerfile** and **build
@@ -60,23 +74,25 @@ analyze the image tarball later on and ensure it has the digest you expect.
 
 ## Features
 
-- Uses a pinned BuildKit version under the hood, but you can also provide your
-  own image
-  * Note that the script is currently tested against BuildKit v0.19.0 and
-    v0.20.0.
-- Accepts
-  [`SOURCE_DATE_EPOCH`](https://github.com/moby/buildkit/blob/master/docs/build-repro.md#source_date_epoch)
-  either explicitly, or from an ISO datetime
-- Passes `rewrite-timestamp=true` to BuildKit, so that image layers have files
-  with a predictable timestamp
-- Disables provenance creation, which conflicts with reproducibility
-- Tested against various versions of Podman and Docker
-- Can run in rootless mode (Podman-only)
-- Supports a dry-run mode which prints the commands that would run
+- **GitHub Actions Support**: Built-in actions for building and verifying reproducible images in your CI/CD pipelines.
+- **Pinned BuildKit**: Uses a pinned BuildKit version (v0.19.0 by default) to ensure environment consistency.
+- **[`SOURCE_DATE_EPOCH`](https://github.com/moby/buildkit/blob/master/docs/build-repro.md#source_date_epoch) Control**: Accepts timestamps as Unix epochs or RFC 3339 datetimes to normalize file modification times.
+- **Automatic Timestamp Normalization**: Passes `rewrite-timestamp=true` to BuildKit, ensuring image layers have predictable timestamps.
+- **Provenance Disabling**: Automatically disables provenance creation, which often introduces non-determinism.
+- **Multi-Runtime Support**: Works seamlessly with both Docker (via Buildx) and Podman.
+- **Rootless Support**: Can run in rootless mode with Podman for enhanced security.
+- **Analysis Tool**: Built-in `analyze` command to inspect OCI/Docker tarballs and verify digests.
+- **Reproducible Base Images**: Provides daily-updated reproducible images (currently Debian-only).
 
-As you can see, `repro-build` is a convenient wrapper over BuildKit. It doesn't
-add any new features of each own, which means you can also run it once to check
-the underlying commands, and use them in your project.
+## Reproducible images in this repository
+
+This repository automatically builds and publishes several reproducible images
+to GHCR. These images are updated daily and verified for reproducibility across
+different environments and BuildKit versions.
+
+| Distro | Dockerfile | GHCR Link |
+|--------|------------|-----------|
+| Debian | [Dockerfile.debian](Dockerfile.debian) | [ghcr.io/freedomofpress/repro-build/debian](https://ghcr.io/freedomofpress/repro-build/debian) |
 
 ## Usage
 
@@ -128,26 +144,121 @@ ERROR: existing instance for "repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f
  => => exporting config sha256:b1fbf0683ddec2760c7cc4fada2cff4a28a6654958902ba42e6fc58295ead88e                                                                                                                                          0.0s
  => => sending tarball
 ```
-For more options, pass the `--help` flag.
 
-### Build and push a container image on GitHub Actions
+#### `build` options
 
-Here's how you can reproducibly build and push a container image via GitHub
-actions:
+| Option | Description |
+|--------|-------------|
+| `--runtime` | Container runtime (`docker` or `podman`). Auto-detected if not provided. |
+| `--datetime` | ISO format datetime for image layers. |
+| `--source-date-epoch`, `--sde` | Unix timestamp for image layers. |
+| `--buildkit-image` | Custom BuildKit image to use. |
+| `--no-cache` | Build from scratch without using cache. |
+| `--rootless` | Run BuildKit in rootless mode (Podman only). |
+| `-f`, `--file` | Path to the Dockerfile. |
+| `-o`, `--output` | Path to save the output tarball (default: `image.tar`). |
+| `-t`, `--tag` | Tag the built image. |
+| `--build-arg` | Set build-time variables (can be used multiple times). |
+| `--annotation` | Add image annotations (can be used multiple times). |
+| `--platform` | Target platform(s) for the build. |
+| `--buildkit-args` | Extra arguments for BuildKit (Podman only). |
+| `--buildx-args` | Extra arguments for Docker Buildx (Docker only). |
+| `--dry` | Dry-run mode (prints commands instead of running them). |
+
+### Build a container image on GitHub Actions
+
+This repository provides two GitHub Actions to help you build and verify
+reproducible images.
+
+#### Reproducible build action (`freedomofpress/repro-build@v1`)
+
+This action builds a container image reproducibly using Docker Buildx and the
+standard `docker/build-push-action`. It is a wrapper that handles
+`SOURCE_DATE_EPOCH` validation and ensures the `rewrite-timestamp=true` output
+option is set.
+
+**Example Usage:**
 
 ```yaml
-- name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@v3
-  with:
-    driver-opts: image=moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe
-
 - name: Reproducibly build and push image
-  uses: docker/build-push-action@v6
+  uses: freedomofpress/repro-build@v1
   with:
-    provenance: false
-    build-args: SOURCE_DATE_EPOCH=1677619260
-    outputs: type=registry,name=...,rewrite-timestamp=true
+    tags: ghcr.io/my-org/my-image:latest
+    file: Dockerfile
+    platforms: linux/amd64,linux/arm64
+    source_date_epoch: 1677619260
+    push: true
 ```
+
+##### Inputs
+
+| Name | Description | Default |
+|------|-------------|---------|
+| `tags` | Tags for the image (comma-separated). | |
+| `file` | Path to the Dockerfile. | |
+| `context` | Build context. | |
+| `platforms` | Platforms to build for (e.g., `linux/amd64,linux/arm64`). | |
+| `buildkit_image` | BuildKit image to use. | `moby/buildkit:v0.19.0@...` |
+| `source_date_epoch` | `SOURCE_DATE_EPOCH` value. | |
+| `timestamp` | RFC 3339 timestamp to use as `SOURCE_DATE_EPOCH`. | |
+| `push` | Whether to push to registry. | `false` |
+| `outputs` | List of output destinations. | |
+| `annotations` | List of annotations to set. | |
+| `labels` | List of metadata for an image. | |
+| `build-args` | List of build-time variables. | |
+| `cache` | Whether to enable caching. | `true` |
+| `cache-from` | List of external cache sources. | |
+| `cache-to` | List of external cache destinations. | |
+| `cache-map` | Mapping for `buildkit-cache-dance`. | |
+| `secrets` | List of secrets to expose to the build. | |
+| `secret-files` | List of secret files to expose to the build. | |
+| `ssh` | List of SSH agent socket or keys. | |
+| `target` | Sets the target stage to build. | |
+| `no-cache` | Do not use cache. | `false` |
+| `pull` | Always attempt to pull a newer version of the image. | `false` |
+| `sbom` | Generate SBOM attestation. | `false` |
+| `no-setup-buildx` | Whether to skip the Buildx setup step. | `false` |
+
+##### Outputs
+
+| Name | Description |
+|------|-------------|
+| `imageid` | Image ID. |
+| `digest` | Image digest. |
+| `metadata` | Build metadata. |
+
+#### Reproduce and verify action (`freedomofpress/repro-build/verify@v1`)
+
+Rebuilds an image and verifies its digest against an expected value or a target image.
+
+**Example Usage:**
+
+```yaml
+- name: Verify image reproducibility
+  uses: freedomofpress/repro-build/verify@v1
+  with:
+    target_image: ghcr.io/my-org/my-image:latest
+    file: Dockerfile
+    platforms: linux/amd64
+    source_date_epoch: 1677619260
+    runtime: podman
+```
+
+##### Inputs
+
+| Name | Description | Default |
+|------|-------------|---------|
+| `expected_digest` | Expected image digest (e.g., `sha256:...`). | |
+| `target_image` | Image to fetch digest from for verification. | |
+| `file` | Path to the Dockerfile. | `Dockerfile` |
+| `context` | Build context. | `.` |
+| `platforms` | Target platform (e.g., `linux/amd64`). | `linux/amd64` |
+| `buildkit_image` | BuildKit image to use. | |
+| `runtime` | Container runtime (`docker` or `podman`). | `podman` |
+| `source_date_epoch` | `SOURCE_DATE_EPOCH` value. | |
+| `build-args` | Additional build arguments (comma-separated `ARG=VALUE`). | |
+| `output` | Path to save the image tarball. | `/tmp/image.tar` |
+| `tags` | Tags for the image. | |
 
 ### Analyze a container image in .tar format
 
@@ -245,5 +356,7 @@ to get started, we suggest reading the following:
 
 ## Credits
 
-Credits go to [@AkihiroSuda](https://github.com/AkihiroSuda) who has been
-pivotal in making reproducible containers a reality.
+Credits go to [@AkihiroSuda](https://github.com/AkihiroSuda) who has provided
+the necessary scaffolding (see
+[https://github.com/reproducible-containers](https://github.com/reproducible-containers))
+that this project is based on.
