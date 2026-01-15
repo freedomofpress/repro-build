@@ -1,0 +1,107 @@
+name: Create reproducible builds for this repo
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+  push:
+
+permissions:
+  packages: write
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/repro-build
+
+jobs:
+  repro-build-push:
+    name: ${{ matrix.image.distro }} / ${{ matrix.image.base }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - distro: debian
+            version: trixie
+            base: trixie-20260112-slim
+          - distro: debian
+            version: bookworm
+            base: bookworm-20260112-slim
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Compute image parameters
+        id: params
+        run: |
+          ARCHIVE_DATE=$(date -u +'%Y%m%d')
+          SOURCE_DATE_EPOCH=$(date -u -d ${ARCHIVE_DATE} +"%s")
+          IMAGE=${{ env.IMAGE_PREFIX }}/${{ matrix.image.distro }}
+          TAG=${IMAGE}:${{ matrix.image.version }}-${ARCHIVE_DATE}
+          echo "archive_date=${DEBIAN_ARCHIVE_DATE}" >> $GITHUB_OUTPUT
+          echo "source_date_epoch=${SOURCE_DATE_EPOCH}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reproducibly build image
+        uses: ./
+        with:
+          tags: ${{ steps.params.outputs.tag }}
+          file: Dockerfile.${{ matrix.image.distro }}
+          platforms: linux/amd64,linux/arm64
+          source_date_epoch: ${{ steps.params.outputs.source_date_epoch }}
+          build-args: DEBIAN_IMAGE_TAG=${{ matrix.image.base }}
+          push: true
+          cache: true
+
+  repro-verify:
+    name: Verify ${{ matrix.image.distro }} / ${{ matrix.image.base }} / ${{ matrix.platform }} / ${{ matrix.buildkit.desc }}
+    needs: repro-build-push
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - distro: debian
+            version: trixie
+            base: trixie-20260112-slim
+          - distro: debian
+            version: bookworm
+            base: bookworm-20260112-slim
+        platform:
+          - linux/amd64
+          - linux/arm64
+        buildkit:
+          - image: "docker.io/moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
+            desc: "Buildkit (v0.19.0)"
+          - image: "docker.io/moby/buildkit:latest"
+            desc: "Buildkit (latest)"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Compute image parameters
+        id: params
+        run: |
+          ARCHIVE_DATE=$(date -u +'%Y%m%d')
+          SOURCE_DATE_EPOCH=$(date -u -d ${ARCHIVE_DATE} +"%s")
+          IMAGE=${{ env.IMAGE_PREFIX }}/${{ matrix.image.distro }}
+          TAG=${IMAGE}:${{ matrix.image.version }}-${ARCHIVE_DATE}
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "source_date_epoch=${SOURCE_DATE_EPOCH}" >> $GITHUB_OUTPUT
+
+      - name: Verify image
+        uses: ./verify
+        with:
+          target_image: ${{ steps.params.outputs.tag }}
+          file: Dockerfile.${{ matrix.image.distro }}
+          platforms: ${{ matrix.platform }}
+          buildkit_image: ${{ matrix.buildkit.image }}
+          source_date_epoch: ${{ steps.params.outputs.source_date_epoch }}
+          build-args: DEBIAN_IMAGE_TAG=${{ matrix.image.base }}
+          runtime: podman
