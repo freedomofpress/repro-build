@@ -1,0 +1,185 @@
+name: "Reproducible Build"
+description: "Builds a container image reproducibly using Docker Buildx"
+inputs:
+  tags:
+    description: "Tags for the image (comma-separated)"
+    required: false
+  file:
+    description: "Path to the Dockerfile"
+    required: false
+  context:
+    description: "Build context"
+    required: false
+  platforms:
+    description: "Platforms to build for (e.g., linux/amd64,linux/arm64)"
+    required: false
+  buildkit_image:
+    description: "BuildKit image to use"
+    required: false
+    default: "moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
+  source_date_epoch:
+    description: "SOURCE_DATE_EPOCH value"
+    required: false
+  timestamp:
+    description: "RFC 3339 timestamp to use as SOURCE_DATE_EPOCH"
+    required: false
+  push:
+    description: "Whether to push to registry"
+    required: false
+    default: false
+  outputs:
+    description: "List of output destinations"
+    required: false
+  annotations:
+    description: "List of annotations to set"
+    required: false
+  labels:
+    description: "List of metadata for an image"
+    required: false
+  build-args:
+    description: "List of build-time variables"
+    required: false
+  cache:
+    description: "Whether to enable caching"
+    required: false
+    default: true
+  cache-from:
+    description: "List of external cache sources"
+    required: false
+    #default: "type=gha"
+  cache-to:
+    description: "List of external cache destinations"
+    required: false
+    #default: "type=gha,mode=max"
+  cache-map:
+    description: "Mapping of host paths to container paths for caching"
+    required: false
+  secrets:
+    description: "List of secrets to expose to the build"
+    required: false
+  secret-files:
+    description: "List of secret files to expose to the build"
+    required: false
+  ssh:
+    description: "List of SSH agent socket or keys to expose to the build"
+    required: false
+  target:
+    description: "Sets the target stage to build"
+    required: false
+  no-cache:
+    description: "Do not use cache when building the image"
+    required: false
+    default: false
+  pull:
+    description: "Always attempt to pull a newer version of the image"
+    required: false
+    default: false
+  sbom:
+    description: "Generate SBOM attestation"
+    required: false
+    default: false
+  no-setup-buildx:
+    description: "Whether to skip the buildx setup step"
+    required: false
+    default: false
+
+outputs:
+  imageid:
+    description: "Image ID"
+    value: ${{ steps.build.outputs.imageid }}
+  digest:
+    description: "Image digest"
+    value: ${{ steps.build.outputs.digest }}
+  metadata:
+    description: "Build metadata"
+    value: ${{ steps.build.outputs.metadata }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Set up Docker Buildx"
+      if: ${{ inputs.no-setup-buildx != 'true' && inputs.buildkit_image == '' }}
+      uses: "docker/setup-buildx-action@v3"
+
+    - name: "Set up Docker Buildx (with driver-opts)"
+      if: ${{ inputs.no-setup-buildx != 'true' && inputs.buildkit_image != '' }}
+      uses: "docker/setup-buildx-action@v3"
+      with:
+        driver-opts: "image=${{ inputs.buildkit_image }}"
+
+    - name: "Validate and process SOURCE_DATE_EPOCH"
+      id: "epoch"
+      shell: "bash"
+      run: |
+        if [ -n "${{ inputs.source_date_epoch }}" ]; then
+          echo "Using provided source_date_epoch: ${{ inputs.source_date_epoch }}"
+          echo "value=${{ inputs.source_date_epoch }}" >> "$GITHUB_OUTPUT"
+        elif [ -n "${{ inputs.timestamp }}" ]; then
+          echo "Translating timestamp to Unix epoch: ${{ inputs.timestamp }}"
+          # date -u -d is GNU date, works for RFC 3339. %s is seconds since epoch.
+          EPOCH=$(date -u -d "${{ inputs.timestamp }}" +%s)
+          echo "Translated value: $EPOCH"
+          echo "value=$EPOCH" >> "$GITHUB_OUTPUT"
+        else
+          echo "Error: Either 'source_date_epoch' or 'timestamp' must be provided."
+          exit 1
+        fi
+
+    - name: "Inject buildx delay"
+      if: ${{ inputs.cache && inputs.cache-map }}
+      uses: "reproducible-containers/buildkit-cache-dance@v3"
+      with:
+        cache-map: ${{ inputs.cache-map }}
+
+    - name: "Prepare outputs"
+      id: "prep"
+      shell: "bash"
+      run: |
+        cat <<'EOF' > outputs_raw.txt
+        ${{ inputs.outputs }}
+        EOF
+
+        if [ -s outputs_raw.txt ] && grep -q '[^[:space:]]' outputs_raw.txt; then
+          sed '/rewrite-timestamp=true/! s/$/,rewrite-timestamp=true/' outputs_raw.txt > outputs_processed.txt
+        else
+          if [ "${{ inputs.push }}" = "false" ]; then
+            echo "type=docker,rewrite-timestamp=true" > outputs_processed.txt
+          else
+            echo "type=registry,rewrite-timestamp=true" > outputs_processed.txt
+          fi
+        fi
+
+        echo "Final outputs to be used:"
+        cat outputs_processed.txt
+
+        {
+          echo "outputs<<EOF"
+          cat outputs_processed.txt
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: "Build image"
+      uses: "docker/build-push-action@v6"
+      id: "build"
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.file }}
+        platforms: ${{ inputs.platforms }}
+        push: ${{ inputs.push }}
+        tags: ${{ inputs.tags }}
+        labels: ${{ inputs.labels }}
+        annotations: ${{ inputs.annotations }}
+        provenance: false
+        sbom: ${{ inputs.sbom }}
+        cache-from: ${{ inputs.cache-from }}
+        cache-to: ${{ inputs.cache-to }}
+        build-args: |
+          SOURCE_DATE_EPOCH=${{ steps.epoch.outputs.value }}
+          ${{ inputs.build-args }}
+        secrets: ${{ inputs.secrets }}
+        secret-files: ${{ inputs.secret-files }}
+        ssh: ${{ inputs.ssh }}
+        target: ${{ inputs.target }}
+        no-cache: ${{ inputs.no-cache }}
+        pull: ${{ inputs.pull }}
+        outputs: ${{ steps.prep.outputs.outputs }}

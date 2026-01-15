@@ -1,0 +1,133 @@
+name: 'Reproduce and Verify'
+description: 'Reproduce a container image and verify its digest using repro-build script'
+inputs:
+  expected_digest:
+    description: 'Expected image digest (e.g., sha256:...) '
+    required: false
+  target_image:
+    description: 'Image to reproduce and verify (e.g., ghcr.io/org/repo:tag)'
+    required: false
+  file:
+    description: 'Path to the Dockerfile'
+    required: false
+    default: 'Dockerfile'
+  context:
+    description: 'Build context'
+    required: false
+    default: '.'
+  platforms:
+    description: 'Target platform (e.g., linux/amd64)'
+    required: false
+    default: 'linux/amd64'
+  buildkit_image:
+    description: 'BuildKit image to use'
+    required: false
+  runtime:
+    description: 'Container runtime (docker or podman)'
+    required: false
+    default: 'podman'
+  source_date_epoch:
+    description: 'SOURCE_DATE_EPOCH value'
+    required: false
+  build-args:
+    description: 'Additional build arguments (comma-separated ARG=VALUE)'
+    required: false
+  output:
+    description: 'Path to save the image tarball'
+    required: false
+    default: '/tmp/image.tar'
+  tags:
+    description: 'Tags for the image'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Determine Digest
+      id: digest
+      shell: bash
+      run: |
+        if [[ -n "${{ inputs.expected_digest }}" ]]; then
+          echo "value=${{ inputs.expected_digest }}" >> "$GITHUB_OUTPUT"
+          echo "method=provided" >> "$GITHUB_OUTPUT"
+        elif [[ -n "${{ inputs.target_image }}" ]]; then
+          echo "method=crane" >> "$GITHUB_OUTPUT"
+        else
+          echo "Error: Either 'expected_digest' or 'target_image' must be provided."
+          exit 1
+        fi
+
+    - name: Install Crane
+      if: steps.digest.outputs.method == 'crane'
+      uses: imjasonh/setup-crane@v0.4
+
+    - name: Fetch digest with Crane
+      if: steps.digest.outputs.method == 'crane'
+      id: crane
+      shell: bash
+      run: |
+        DIGEST=$(crane digest "${{ inputs.target_image }}" --platform "${{ inputs.platforms }}")
+        echo "value=$DIGEST" >> "$GITHUB_OUTPUT"
+
+    - name: Set final digest
+      id: final
+      shell: bash
+      run: |
+        if [[ "${{ steps.digest.outputs.method }}" == "provided" ]]; then
+          echo "value=${{ steps.digest.outputs.value }}" >> "$GITHUB_OUTPUT"
+        else
+          echo "value=${{ steps.crane.outputs.value }}" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Reproduce image
+      shell: bash
+      run: |
+        REPRO_SCRIPT="${{ github.action_path }}/../repro-build"
+        # Split build_args by comma
+        IFS=',' read -ra ADDR <<< "${{ inputs.build-args }}"
+        BA_ARGS=()
+        for i in "${ADDR[@]}"; do
+          if [[ -n "$i" ]]; then
+            BA_ARGS+=("--build-arg" "$i")
+          fi
+        done
+
+        # Handle optional arguments
+        BK_ARGS=()
+        if [[ -n "${{ inputs.buildkit_image }}" ]]; then
+            BK_ARGS+=("--buildkit-image" "${{ inputs.buildkit_image }}")
+        fi
+
+        SDE_ARGS=()
+        if [[ -n "${{ inputs.source_date_epoch }}" ]]; then
+             SDE_ARGS+=("--source-date-epoch" "${{ inputs.source_date_epoch }}")
+        fi
+
+        TAG_ARGS=()
+        if [[ -n "${{ inputs.tags }}" ]]; then
+            TAG_ARGS+=("-t" "${{ inputs.tags }}")
+        fi
+
+        python3 "$REPRO_SCRIPT" build \
+          --runtime "${{ inputs.runtime }}" \
+          "${BK_ARGS[@]}" \
+          "${SDE_ARGS[@]}" \
+          --platform "${{ inputs.platforms }}" \
+          "${TAG_ARGS[@]}" \
+          -f "${{ inputs.file }}" \
+          -o "${{ inputs.output }}" \
+          "${BA_ARGS[@]}" \
+          "${{ inputs.context }}"
+
+    - name: Verify digest
+      shell: bash
+      run: |
+        REPRO_SCRIPT="${{ github.action_path }}/../repro-build"
+        python3 "$REPRO_SCRIPT" analyze \
+          --show-contents \
+          --expected-image-digest "${{ steps.final.outputs.value }}" \
+          "${{ inputs.output }}"
