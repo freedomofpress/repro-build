@@ -49,6 +49,15 @@ environment. `repro-build` saves you time by doing just that. Not only that, but
 we have a nightly job which ensures that `repro-build` will continue to do so
 for future versions of Docker, Podman, and BuildKit.
 
+## Reproducible Images in this Repository
+
+This repository automatically builds and publishes several reproducible images to GHCR. These images are updated daily and verified for reproducibility across different environments and BuildKit versions.
+
+| Distro | Base Image | Dockerfile | Build Arguments | GHCR Link |
+|--------|------------|------------|-----------------|-----------|
+| Debian Trixie | `trixie-20260112-slim` | [Dockerfile.debian](Dockerfile.debian) | `DEBIAN_IMAGE_TAG=trixie-20260112-slim` | [ghcr.io/freedomofpress/repro-build/debian](https://ghcr.io/freedomofpress/repro-build/debian) |
+| Debian Bookworm | `bookworm-20260112-slim` | [Dockerfile.debian](Dockerfile.debian) | `DEBIAN_IMAGE_TAG=bookworm-20260112-slim` | [ghcr.io/freedomofpress/repro-build/debian](https://ghcr.io/freedomofpress/repro-build/debian) |
+
 ## How it works
 
 In a nutshell, `repro-build` builds your container using a pinned version of
@@ -132,21 +141,42 @@ For more options, pass the `--help` flag.
 
 ### Build and push a container image on GitHub Actions
 
-Here's how you can reproducibly build and push a container image via GitHub
-actions:
+This repository provides two GitHub Actions to help you build and verify reproducible images.
+
+#### Reproducible Build Action (`action.yml`)
+
+This action builds a container image reproducibly using Docker Buildx and the standard `docker/build-push-action`. It is a wrapper that handles `SOURCE_DATE_EPOCH` validation and ensures the `rewrite-timestamp=true` output option is set.
+
+**Example Usage:**
 
 ```yaml
-- name: Set up Docker Buildx
-  uses: docker/setup-buildx-action@v3
-  with:
-    driver-opts: image=moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe
-
 - name: Reproducibly build and push image
-  uses: docker/build-push-action@v6
+  uses: freedomofpress/repro-build@rewrite
   with:
-    provenance: false
-    build-args: SOURCE_DATE_EPOCH=1677619260
-    outputs: type=registry,name=...,rewrite-timestamp=true
+    tags: ghcr.io/my-org/my-image:latest
+    file: Dockerfile
+    platforms: linux/amd64,linux/arm64
+    source_date_epoch: 1677619260
+    push: true
+```
+
+#### Reproduce and Verify Action (`verify/action.yml`)
+
+This action uses the `repro-build` script to rebuild an image and verify its digest against an expected value. It supports both Docker and Podman runtimes. You can either provide an `expected_digest` explicitly, or a `target_image` from which the digest will be automatically detected using `crane`.
+
+Using `target_image` is particularly useful for verifying the reproducibility of the `:latest` tag of an image, as long as you have the latest Dockerfile and build arguments.
+
+**Example Usage:**
+
+```yaml
+- name: Verify image reproducibility
+  uses: freedomofpress/repro-build/verify@rewrite
+  with:
+    target_image: ghcr.io/my-org/my-image:latest
+    file: Dockerfile
+    platforms: linux/amd64
+    source_date_epoch: 1677619260
+    runtime: podman
 ```
 
 ### Analyze a container image in .tar format
