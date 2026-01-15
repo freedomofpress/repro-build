@@ -139,9 +139,13 @@ runs:
         EOF
 
         if [ -s outputs_raw.txt ] && grep -q '[^[:space:]]' outputs_raw.txt; then
-          sed 's/\(,rewrite-timestamp=true\)*$/,rewrite-timestamp=true/' outputs_raw.txt > outputs_processed.txt
+          sed '/rewrite-timestamp=true/! s/$/,rewrite-timestamp=true/' outputs_raw.txt > outputs_processed.txt
         else
-          echo "rewrite-timestamp=true" > outputs_processed.txt
+          if [ "${{ inputs.push }}" = "false" ]; then
+            echo "type=docker,rewrite-timestamp=true" > outputs_processed.txt
+          else
+            echo "type=registry,rewrite-timestamp=true" > outputs_processed.txt
+          fi
         fi
 
         echo "Final outputs to be used:"
