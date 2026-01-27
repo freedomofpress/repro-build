@@ -62,11 +62,11 @@ runs:
         fi
 
     - name: Install Crane
-      if: steps.digest.outputs.method == 'crane'
+      if: ${{ steps.digest.outputs.method == 'crane' }}
       uses: imjasonh/setup-crane@v0.4
 
     - name: Fetch digest with Crane
-      if: steps.digest.outputs.method == 'crane'
+      if: ${{ steps.digest.outputs.method == 'crane' }}
       id: crane
       shell: bash
       run: |
