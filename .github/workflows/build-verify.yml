@@ -37,7 +37,7 @@ jobs:
           SOURCE_DATE_EPOCH=$(date -u -d ${ARCHIVE_DATE} +"%s")
           IMAGE=${{ env.IMAGE_PREFIX }}/${{ matrix.image.distro }}
           TAG=${IMAGE}:${{ matrix.image.version }}-${ARCHIVE_DATE}
-          echo "archive_date=${DEBIAN_ARCHIVE_DATE}" >> $GITHUB_OUTPUT
+          echo "archive_date=${ARCHIVE_DATE}" >> $GITHUB_OUTPUT
           echo "source_date_epoch=${SOURCE_DATE_EPOCH}" >> $GITHUB_OUTPUT
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
