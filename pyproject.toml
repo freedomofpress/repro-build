@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "repro-build"
+version = "1.0.0"
+description = "Build bit-for-bit reproducible container images"
+authors = [{ name = "Freedom of the Press Foundation", email = "info@freedom.press" }]
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT OR Apache-2.0" }
+keywords = [
+  "docker", "podman", "buildkit", "reproducible-builds", "containers"
+]
+
+[project.scripts]
+repro-build = "repro_build.repro_build:main"
+
+[project.urls]
+Repository = "https://github.com/freedomofpress/repro-build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/repro_build"]

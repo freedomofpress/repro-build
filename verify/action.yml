@@ -112,7 +112,7 @@ runs:
             TAG_ARGS+=("-t" "${{ inputs.tags }}")
         fi
 
-        python3 "$REPRO_SCRIPT" build \
+        "$REPRO_SCRIPT" build \
           --runtime "${{ inputs.runtime }}" \
           "${BK_ARGS[@]}" \
           "${SDE_ARGS[@]}" \
@@ -127,7 +127,7 @@ runs:
       shell: bash
       run: |
         REPRO_SCRIPT="${{ github.action_path }}/../repro-build"
-        python3 "$REPRO_SCRIPT" analyze \
+        "$REPRO_SCRIPT" analyze \
           --show-contents \
           --expected-image-digest "${{ steps.final.outputs.value }}" \
           "${{ inputs.output }}"

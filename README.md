@@ -145,6 +145,13 @@ ERROR: existing instance for "repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f
  => => sending tarball
 ```
 
+Alternatively, if you have [`uv`](https://docs.astral.sh/uv/) installed, you can run
+it directly with `uvx`:
+
+```console
+$ uvx repro-build build --sde 0 .
+```
+
 #### `build` options
 
 | Option | Description |
