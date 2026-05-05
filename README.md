@@ -177,7 +177,7 @@ $ uvx repro-build build --sde 0 .
 This repository provides two GitHub Actions to help you build and verify
 reproducible images.
 
-#### Reproducible build action (`freedomofpress/repro-build@v1`)
+#### Reproducible build action (`freedomofpress/repro-build@1.0.0`)
 
 This action builds a container image reproducibly using Docker Buildx and the
 standard `docker/build-push-action`. It is a wrapper that handles
@@ -188,7 +188,7 @@ option is set.
 
 ```yaml
 - name: Reproducibly build and push image
-  uses: freedomofpress/repro-build@v1
+  uses: freedomofpress/repro-build@1.0.0
   with:
     tags: ghcr.io/my-org/my-image:latest
     file: Dockerfile
@@ -234,7 +234,7 @@ option is set.
 | `digest` | Image digest. |
 | `metadata` | Build metadata. |
 
-#### Reproduce and verify action (`freedomofpress/repro-build/verify@v1`)
+#### Reproduce and verify action (`freedomofpress/repro-build/verify@1.0.0`)
 
 Rebuilds an image and verifies its digest against an expected value or a target image.
 
@@ -242,7 +242,7 @@ Rebuilds an image and verifies its digest against an expected value or a target 
 
 ```yaml
 - name: Verify image reproducibility
-  uses: freedomofpress/repro-build/verify@v1
+  uses: freedomofpress/repro-build/verify@1.0.0
   with:
     target_image: ghcr.io/my-org/my-image:latest
     file: Dockerfile
