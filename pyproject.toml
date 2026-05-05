@@ -10,6 +10,10 @@ authors = [{ name = "Freedom of the Press Foundation", email = "info@freedom.pre
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT OR Apache-2.0" }
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
+]
 keywords = [
   "docker", "podman", "buildkit", "reproducible-builds", "containers"
 ]

@@ -12,6 +12,7 @@
 - [Sources of non-determinism](#sources-of-non-determinism)
 - [Other considerations](#other-considerations)
 - [Read more](#read-more)
+- [License](#license)
 - [Credits](#credits)
 
 `repro-build` is a script that helps you build bit-for-bit reproducible
@@ -360,6 +361,19 @@ to get started, we suggest reading the following:
 * https://github.com/reproducible-containers/
 * https://github.com/moby/buildkit/blob/master/docs/build-repro.md
 * https://wiki.debian.org/ReproducibleBuilds/About
+
+## License
+
+Licensed under either of:
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or https://www.apache.org/licenses/LICENSE-2.0)
+- MIT License ([LICENSE-MIT](LICENSE-MIT) or https://opensource.org/licenses/MIT)
+
+at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this project by you shall be dual licensed as above, without
+any additional terms or conditions.
 
 ## Credits
 
