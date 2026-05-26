@@ -40,6 +40,9 @@ inputs:
   tags:
     description: 'Tags for the image'
     required: false
+  annotations:
+    description: 'List of annotations to set'
+    required: false
 runs:
   using: 'composite'
   steps:
@@ -113,12 +116,21 @@ runs:
             TAG_ARGS+=("-t" "${{ inputs.tags }}")
         fi
 
+        ANNOTATION_ARGS=()
+        IFS=',' read -ra ADDR <<< "${{ inputs.annotations }}"
+        for i in "${ADDR[@]}"; do
+          if [[ -n "$i" ]]; then
+            ANNOTATION_ARGS+=("--annotation" "$i")
+          fi
+        done
+
         "$REPRO_SCRIPT" build \
           --runtime "${{ inputs.runtime }}" \
           "${BK_ARGS[@]}" \
           "${SDE_ARGS[@]}" \
           --platform "${{ inputs.platforms }}" \
           "${TAG_ARGS[@]}" \
+          "${ANNOTATION_ARGS[@]}" \
           -f "${{ inputs.file }}" \
           -o "${{ inputs.output }}" \
           "${BA_ARGS[@]}" \

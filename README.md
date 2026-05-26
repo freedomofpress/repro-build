@@ -267,6 +267,7 @@ Rebuilds an image and verifies its digest against an expected value or a target 
 | `build-args` | Additional build arguments (comma-separated `ARG=VALUE`). | |
 | `output` | Path to save the image tarball. | `/tmp/image.tar` |
 | `tags` | Tags for the image. | |
+| `annotations` | List of annotations to set. | |
 
 ### Analyze a container image in .tar format
 
