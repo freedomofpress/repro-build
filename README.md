@@ -261,7 +261,7 @@ Rebuilds an image and verifies its digest against an expected value or a target 
 | `file` | Path to the Dockerfile. | `Dockerfile` |
 | `context` | Build context. | `.` |
 | `platforms` | Target platform (e.g., `linux/amd64`). | `linux/amd64` |
-| `buildkit_image` | BuildKit image to use. | |
+| `buildkit_image` | BuildKit image to use. | `moby/buildkit:v0.19.0@...` |
 | `runtime` | Container runtime (`docker` or `podman`). | `podman` |
 | `source_date_epoch` | `SOURCE_DATE_EPOCH` value. | |
 | `build-args` | Additional build arguments (comma-separated `ARG=VALUE`). | |
