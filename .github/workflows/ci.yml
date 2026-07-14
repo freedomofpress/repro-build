@@ -21,13 +21,13 @@ jobs:
         arch:
           - suffix: ""
             name: "amd64"
-            digest: "sha256:b0088ba0110c2acfe757eaf41967ac09fe16e96a8775b998577f86d90b3dbe53"
+            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
           - suffix: "-arm"
             name: "arm64"
-            digest: "sha256:321b97a58f703cc2faac96fd6b107058c60e010306786fe3417eae0d6cc862f9"
+            digest: "sha256:237bf2285cdd9b7d64a16d58395f2b827aa8270f63ab1d77bfeda6687d0d36a2"
         buildkit:
-          - image: "docker.io/moby/buildkit:v19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
-            desc: "Buildkit (v0.19.0)"
+          - image: "docker.io/moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
+            desc: "Buildkit (v0.31.0)"
           - image: "docker.io/moby/buildkit:latest"
             desc: "Buildkit (latest)"
         runtime:
@@ -81,14 +81,14 @@ jobs:
         arch:
           - suffix: ""
             name: "amd64"
-            digest: "sha256:b0088ba0110c2acfe757eaf41967ac09fe16e96a8775b998577f86d90b3dbe53"
+            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
           - suffix: "-arm"
             name: "arm64"
-            digest: "sha256:321b97a58f703cc2faac96fd6b107058c60e010306786fe3417eae0d6cc862f9"
+            digest: "sha256:237bf2285cdd9b7d64a16d58395f2b827aa8270f63ab1d77bfeda6687d0d36a2"
         buildkit:
-          - image: "docker.io/moby/buildkit:v19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
-            desc: "Buildkit (v0.19.0)"
-            short: bk0.19.0
+          - image: "docker.io/moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
+            desc: "Buildkit (v0.31.0)"
+            short: bk0.31.0
           - image: "docker.io/moby/buildkit:latest"
             desc: "Buildkit (latest)"
             short: bkl
