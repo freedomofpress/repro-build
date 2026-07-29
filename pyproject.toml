@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "repro-build"
-version = "1.0.0"
+version = "2.0.0"
 description = "Build bit-for-bit reproducible container images"
 authors = [{ name = "Freedom of the Press Foundation", email = "info@freedom.press" }]
 readme = "README.md"
