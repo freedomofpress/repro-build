@@ -24,8 +24,13 @@ ENV_CACHE = "REPRO_CACHE"
 ENV_BUILDKIT = "REPRO_BUILDKIT_IMAGE"
 ENV_ROOTLESS = "REPRO_ROOTLESS"
 
-DEFAULT_BUILDKIT_IMAGE = "moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
-DEFAULT_BUILDKIT_IMAGE_ROOTLESS = "moby/buildkit:v0.19.0-rootless@sha256:e901cffdad753892a7c3afb8b9972549fca02c73888cf340c91ed801fdd96d71"
+# We pin BuildKit to a specific version to ensure reproducible builds. The
+# `latest` tag (and potentially other versions) may introduce non-deterministic
+# changes such as new annotations or altered layer sizes. We test against
+# `latest` in CI to detect such regressions early, but never use it as the
+# default. See: https://github.com/freedomofpress/repro-build/issues/3
+DEFAULT_BUILDKIT_IMAGE = "moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
+DEFAULT_BUILDKIT_IMAGE_ROOTLESS = "moby/buildkit:v0.31.0-rootless@sha256:e335bfb48eec12110318aced51f75161f01e765dd13e6041c0f4600b7c93507f"
 
 MSG_BUILD_CTX = """Build environment:
 - Container runtime: {runtime}
@@ -587,7 +592,7 @@ def define_build_cmd_args(parser: argparse.ArgumentParser) -> None:
             "The BuildKit container image which will be used for building the"
             " reproducible container image. Make sure to pass the '-rootless'"
             " variant if you are using rootless Podman"
-            " (default: docker.io/moby/buildkit:v0.19.0)"
+            " (default: docker.io/moby/buildkit:v0.31.0)"
         ),
     )
     parser.add_argument(

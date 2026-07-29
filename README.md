@@ -76,7 +76,7 @@ analyze the image tarball later on and ensure it has the digest you expect.
 ## Features
 
 - **GitHub Actions Support**: Built-in actions for building and verifying reproducible images in your CI/CD pipelines.
-- **Pinned BuildKit**: Uses a pinned BuildKit version (v0.19.0 by default) to ensure environment consistency.
+- **Pinned BuildKit**: Uses a pinned BuildKit version (v0.31.0 by default) to ensure environment consistency.
 - **[`SOURCE_DATE_EPOCH`](https://github.com/moby/buildkit/blob/master/docs/build-repro.md#source_date_epoch) Control**: Accepts timestamps as Unix epochs or RFC 3339 datetimes to normalize file modification times.
 - **Automatic Timestamp Normalization**: Passes `rewrite-timestamp=true` to BuildKit, ensuring image layers have predictable timestamps.
 - **Provenance Disabling**: Automatically disables provenance creation, which often introduces non-determinism.
@@ -105,7 +105,7 @@ You can build a container image with:
 $ ./repro-build build --sde 0 .
 2025-02-24 09:17:48 - INFO - Build environment:
 - Container runtime: docker
-- BuildKit image: moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe
+- BuildKit image: moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1
 - Rootless support: False
 - Caching enabled: True
 - Build context: ./repro-build
@@ -124,7 +124,7 @@ Podman-only arguments:
 Docker-only arguments:
 - Docker Buildx arguments: (not provided)
 
-2025-02-24 09:17:48 - DEBUG - Running: docker buildx create --name repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056 --driver-opt image=moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe
+2025-02-24 09:17:48 - DEBUG - Running: docker buildx create --name repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056 --driver-opt image=moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1
 ERROR: existing instance for "repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056" but no append mode, specify the node name to make changes for existing instances
 2025-02-24 09:17:48 - DEBUG - Running: docker buildx --builder repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056 build --build-arg SOURCE_DATE_EPOCH=0 --provenance false --output type=docker,dest=/Users/alex.p/repro-build/image.tar,rewrite-timestamp=true /Users/alex.p/repro-build
 [+] Building 81.6s (7/7) FINISHED                                                                                                               docker-container:repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056
@@ -206,7 +206,7 @@ option is set.
 | `file` | Path to the Dockerfile. | |
 | `context` | Build context. | |
 | `platforms` | Platforms to build for (e.g., `linux/amd64,linux/arm64`). | |
-| `buildkit_image` | BuildKit image to use. | `moby/buildkit:v0.19.0@...` |
+| `buildkit_image` | BuildKit image to use. | `moby/buildkit:v0.31.0@...` |
 | `source_date_epoch` | `SOURCE_DATE_EPOCH` value. | |
 | `timestamp` | RFC 3339 timestamp to use as `SOURCE_DATE_EPOCH`. | |
 | `push` | Whether to push to registry. | `false` |
@@ -261,7 +261,7 @@ Rebuilds an image and verifies its digest against an expected value or a target 
 | `file` | Path to the Dockerfile. | `Dockerfile` |
 | `context` | Build context. | `.` |
 | `platforms` | Target platform (e.g., `linux/amd64`). | `linux/amd64` |
-| `buildkit_image` | BuildKit image to use. | `moby/buildkit:v0.19.0@...` |
+| `buildkit_image` | BuildKit image to use. | `moby/buildkit:v0.31.0@...` |
 | `runtime` | Container runtime (`docker` or `podman`). | `podman` |
 | `source_date_epoch` | `SOURCE_DATE_EPOCH` value. | |
 | `build-args` | Additional build arguments (comma-separated `ARG=VALUE`). | |
@@ -353,6 +353,12 @@ while building images:
 * The arguments you pass to the script must be tracked somehow, if you want to
   rebuild your container image in the future. Best way to track them is in your
   Git repo. Else, you may want to add them in your tag, or as labels.
+* **BuildKit is pinned to a specific version.** We do not use the `latest`
+  BuildKit tag as the default because newer versions may introduce
+  non-reproducible changes (e.g. new image annotations, altered layer sizes)
+  even when all other build parameters remain the same. CI tests run against
+  both the pinned version and `latest` to detect such regressions early. See
+  [#3](https://github.com/freedomofpress/repro-build/issues/3) for details.
 
 ## Read more
 

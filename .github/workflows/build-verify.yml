@@ -77,8 +77,8 @@ jobs:
           - linux/amd64
           - linux/arm64
         buildkit:
-          - image: "docker.io/moby/buildkit:v0.19.0@sha256:14aa1b4dd92ea0a4cd03a54d0c6079046ea98cd0c0ae6176bdd7036ba370cbbe"
-            desc: "Buildkit (v0.19.0)"
+          - image: "docker.io/moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
+            desc: "Buildkit (v0.31.0)"
           - image: "docker.io/moby/buildkit:latest"
             desc: "Buildkit (latest)"
     steps:
