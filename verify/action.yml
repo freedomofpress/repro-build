@@ -2,7 +2,7 @@ name: 'Reproduce and Verify'
 description: 'Reproduce a container image and verify its digest using repro-build script'
 inputs:
   expected_digest:
-    description: 'Expected image index digest (e.g., sha256:...)'
+    description: 'Expected image digest (e.g., sha256:...) '
     required: false
   target_image:
     description: 'Image to reproduce and verify (e.g., ghcr.io/org/repo:tag)'
@@ -16,7 +16,7 @@ inputs:
     required: false
     default: '.'
   platforms:
-    description: 'Target platforms (comma-separated, e.g., linux/amd64,linux/arm64). Must cover all platforms of the target image to verify its index digest.'
+    description: 'Target platform (e.g., linux/amd64)'
     required: false
     default: 'linux/amd64'
   buildkit_image:
@@ -69,26 +69,12 @@ runs:
       if: ${{ steps.digest.outputs.method == 'crane' }}
       uses: imjasonh/setup-crane@v0.4
 
-    - name: Determine if target image is an index
+    - name: Fetch digest with Crane
       if: ${{ steps.digest.outputs.method == 'crane' }}
-      id: index
+      id: crane
       shell: bash
       run: |
-        media_type=$(crane manifest "${{ inputs.target_image }}" | jq -r '.mediaType')
-        echo "Target image media type: ${media_type}"
-        if [[ "$media_type" == "application/vnd.oci.image.index.v1+json" \
-           || "$media_type" == "application/vnd.docker.distribution.manifest.list.v2+json" ]]; then
-          echo "is_index=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "is_index=false" >> "$GITHUB_OUTPUT"
-        fi
-
-    - name: Fetch index digest with Crane
-      if: ${{ steps.digest.outputs.method == 'crane' && steps.index.outputs.is_index == 'true' }}
-      id: index_digest
-      shell: bash
-      run: |
-        DIGEST=$(crane digest "${{ inputs.target_image }}")
+        DIGEST=$(crane digest "${{ inputs.target_image }}" --platform "${{ inputs.platforms }}")
         echo "value=$DIGEST" >> "$GITHUB_OUTPUT"
 
     - name: Set final digest
@@ -97,10 +83,8 @@ runs:
       run: |
         if [[ "${{ steps.digest.outputs.method }}" == "provided" ]]; then
           echo "value=${{ steps.digest.outputs.value }}" >> "$GITHUB_OUTPUT"
-        elif [[ "${{ steps.index.outputs.is_index }}" == "true" ]]; then
-          echo "value=${{ steps.index_digest.outputs.value }}" >> "$GITHUB_OUTPUT"
         else
-          echo "value=" >> "$GITHUB_OUTPUT"
+          echo "value=${{ steps.crane.outputs.value }}" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Reproduce image
@@ -153,7 +137,6 @@ runs:
           "${{ inputs.context }}"
 
     - name: Verify digest
-      if: ${{ steps.final.outputs.value != '' }}
       shell: bash
       run: |
         REPRO_SCRIPT="${{ github.action_path }}/../repro-build"
@@ -161,24 +144,3 @@ runs:
           --show-contents \
           --expected-image-digest "${{ steps.final.outputs.value }}" \
           "${{ inputs.output }}"
-
-    - name: Verify per-platform digests
-      if: ${{ steps.digest.outputs.method == 'crane' }}
-      shell: bash
-      run: |
-        set -euo pipefail
-        index_json="$(tar -xOf "${{ inputs.output }}" index.json 2>/dev/null || tar -xOf "${{ inputs.output }}" ./index.json)"
-        IFS=',' read -ra PLATFORMS <<< "${{ inputs.platforms }}"
-        for platform in "${PLATFORMS[@]}"; do
-          platform="$(echo "$platform" | xargs)"
-          [[ -n "$platform" ]] || continue
-          remote="$(crane digest "${{ inputs.target_image }}" --platform "$platform" | cut -d: -f2)"
-          IFS='/' read -ra P <<< "$platform"
-          os="${P[0]}"
-          arch="${P[1]}"
-          local_digest="$(printf '%s' "$index_json" \
-            | jq -r --arg os "$os" --arg arch "$arch" \
-              '.manifests[] | select(.platform.os == $os and .platform.architecture == $arch) | .digest')"
-          echo "Verifying digest for $platform: local=$local_digest remote=sha256:$remote"
-          [[ "$local_digest" == "sha256:$remote" ]]
-        done

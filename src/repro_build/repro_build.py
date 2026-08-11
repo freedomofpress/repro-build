@@ -265,7 +265,9 @@ class Builder:
             raise RuntimeError("Rootless mode is only supported with Podman runtime")
         return rootless
 
-    def _resolve_sde(self, source_date_epoch: int | None, datetime_str: str | None) -> int:
+    def _resolve_sde(
+        self, source_date_epoch: int | None, datetime_str: str | None
+    ) -> int:
         sde = os.environ.get(ENV_SDE, source_date_epoch)
         dt = os.environ.get(ENV_DATETIME, datetime_str)
 
@@ -282,10 +284,9 @@ class Builder:
             d = d.replace(tzinfo=datetime.timezone.utc)
         return int(d.timestamp())
 
-    def _resolve_buildkit_image(self, buildkit_image: str, rootless: bool, runtime: str) -> str:
-        if not buildkit_image:
-            buildkit_image = DEFAULT_BUILDKIT_IMAGE
-
+    def _resolve_buildkit_image(
+        self, buildkit_image: str, rootless: bool, runtime: str
+    ) -> str:
         if rootless and not buildkit_image.startswith("docker.io/"):
             buildkit_image = "docker.io/" + buildkit_image
 
@@ -363,9 +364,7 @@ class Builder:
         for arg in self.build_arg:
             _build_args.append("--opt")
             _build_args.append(f"build-arg:{arg}")
-        platform_args = (
-            ["--opt", f"platform={self.platform}"] if self.platform else []
-        )
+        platform_args = ["--opt", f"platform={self.platform}"] if self.platform else []
 
         cmd = [
             "podman",
@@ -524,7 +523,7 @@ def analyze(args) -> None:
         cur_digest = parsed[0]["digest"].split(":")[1]
         if cur_digest != expected_image_digest:
             raise Exception(
-                f"The image index does not have the expected digest: {cur_digest} != {expected_image_digest}"
+                f"The image does not have the expected digest: {cur_digest} != {expected_image_digest}"
             )
         print(f"✅ Image digest matches {expected_image_digest}")
 
@@ -538,8 +537,7 @@ def analyze_tarball(
 
     Args:
         tarball: Path to the OCI image tarball.
-        expected_image_digest: Optional expected image index digest to verify
-            against.
+        expected_image_digest: Optional expected digest to verify against.
         show_contents: If True, print full file contents.
 
     Returns:
@@ -555,7 +553,7 @@ def analyze_tarball(
         cur_digest = parsed[0]["digest"].split(":")[1]
         if cur_digest != expected_image_digest:
             raise Exception(
-                f"The image index does not have the expected digest: {cur_digest} != {expected_image_digest}"
+                f"The image does not have the expected digest: {cur_digest} != {expected_image_digest}"
             )
         print(f"✅ Image digest matches {expected_image_digest}")
 
@@ -704,7 +702,7 @@ def parse_args() -> dict:
         "--expected-image-digest",
         metavar="DIGEST",
         default=None,
-        help="The expected image (index) digest for the provided image",
+        help="The expected digest for the provided image",
     )
     analyze_parser.add_argument(
         "--show-contents",
