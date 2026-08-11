@@ -74,7 +74,7 @@ runs:
       id: crane
       shell: bash
       run: |
-        DIGEST=$(crane digest "${{ inputs.target_image }}" --platform "${{ inputs.platforms }}")
+        DIGEST=$(crane digest "${{ inputs.target_image }}")
         echo "value=$DIGEST" >> "$GITHUB_OUTPUT"
 
     - name: Set final digest

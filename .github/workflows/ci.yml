@@ -8,13 +8,6 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/repro-build/debian-12
-  DIGEST_MULTI: sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176
-  DIGEST_AMD64: sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176
-  DIGEST_ARM64: sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176
-  BUILDKIT_IMAGE_REF: docker.io/moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1
-  BUILDKIT_DESC_REF: Buildkit (v0.31.0)
-  BUILDKIT_IMAGE_LATEST: docker.io/moby/buildkit:latest
-  BUILDKIT_DESC_LATEST : Buildkit (latest)
 
 jobs:
   local-build-analyze:
@@ -28,18 +21,18 @@ jobs:
         arch:
           - suffix: ""
             platforms: "linux/amd64,linux/arm64"
-            digest: ${{ env.DIGEST_MULTI }}
+            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
           - suffix: ""
             platforms: "linux/amd64"
-            digest: ${{ env.DIGEST_AMD64 }}
+            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
           - suffix: "-arm"
             platforms: "linux/arm64"
-            digest: ${{ env.DIGEST_ARM64 }}
+            digest: "sha256:237bf2285cdd9b7d64a16d58395f2b827aa8270f63ab1d77bfeda6687d0d36a2"
         buildkit:
-          - image: ${{ env.BUILDKIT_IMAGE_REF }}
-            desc: ${{ env.BUILDKIT_DESC_REF }}
-          - image: ${{ env.BUILDKIT_IMAGE_LATEST }}
-            desc: ${{ env.BUILDKIT_DESC_LATEST }}
+          - image: "docker.io/moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
+            desc: "Buildkit (v0.31.0)"
+          - image: "docker.io/moby/buildkit:latest"
+            desc: "Buildkit (latest)"
         runtime:
           - "docker"
           - "podman"
@@ -67,7 +60,7 @@ jobs:
             --runtime \
             ${{ matrix.runtime }} \
             --platform \
-            {{ matrix.arch.platforms }} \
+            ${{ matrix.arch.platforms }} \
             -t \
             ${{ env.IMAGE_NAME }} \
             -f \
@@ -82,6 +75,9 @@ jobs:
             ${{ matrix.arch.digest }} \
             image.tar
 
+      - name: Make sure that tarball can be loaded
+        run: ${{ matrix.runtime }} load -i image.tar
+
   actions-build:
     name: ubuntu-${{ matrix.version }} / repro-build GHA / ${{ matrix.buildkit.desc }}
     runs-on: ubuntu-${{ matrix.version}}${{ matrix.arch.suffix }}
@@ -94,19 +90,19 @@ jobs:
         arch:
           - suffix: ""
             platforms: "linux/amd64,linux/arm64"
-            digest: ${{ env.DIGEST_MULTI }}
+            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
           - suffix: ""
             platforms: "linux/amd64"
-            digest: ${{ env.DIGEST_AMD64 }}
+            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
           - suffix: "-arm"
             platforms: "linux/arm64"
-            digest: ${{ env.DIGEST_ARM64 }}
+            digest: "sha256:237bf2285cdd9b7d64a16d58395f2b827aa8270f63ab1d77bfeda6687d0d36a2"
         buildkit:
-          - image: ${{ env.BUILDKIT_IMAGE_REF }}
-            desc: ${{ env.BUILDKIT_DESC_REF }}
+          - image: "docker.io/moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
+            desc: "Buildkit (v0.31.0)"
             short: bk0.31.0
-          - image: ${{ env.BUILDKIT_IMAGE_LATEST }}
-            desc: ${{ env.BUILDKIT_DESC_LATEST }}
+          - image: "docker.io/moby/buildkit:latest"
+            desc: "Buildkit (latest)"
             short: bkl
     steps:
       - name: Checkout Repository
@@ -132,21 +128,21 @@ jobs:
           echo "name=$name" >> $GITHUB_OUTPUT
 
       - name: Build image
+        id: build
         uses: ./
         with:
-          tags: ${{ steps.image.outputs.tag }}
+          tags: ${{ steps.image.outputs.name }}
           file: Dockerfile.debian-12
-          platforms: ${{ matrix.platforms }}
+          platforms: ${{ matrix.arch.platforms }}
           buildkit_image: ${{ matrix.buildkit.image }}
           source_date_epoch: 1677619260
-          runtime: docker
           push: true
           cache: true
 
       - name: Verify digest
         run: |
-          docker buildx imagetools inspect ${{ steps.image.outputs.tag }}
-          digest=$(docker buildx imagetools inspect ${{ steps.image.outputs.tag }} --format "{{json .Manifest}}" | jq -r '.digest')
+          docker buildx imagetools inspect ${{ steps.image.outputs.name }}
+          digest=${{ steps.build.outputs.digest }}
           echo "Digest is: ${digest}"
           echo "Expected: ${{ matrix.arch.digest }}"
           [[ "$digest" = "${{ matrix.arch.digest }}" ]]
@@ -163,19 +159,19 @@ jobs:
         arch:
           - suffix: ""
             platforms: "linux/amd64,linux/arm64"
-            digest: ${{ env.DIGEST_MULTI }}
+            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
           - suffix: ""
             platforms: "linux/amd64"
-            digest: ${{ env.DIGEST_AMD64 }}
+            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
           - suffix: "-arm"
             platforms: "linux/arm64"
-            digest: ${{ env.DIGEST_ARM64 }}
+            digest: "sha256:237bf2285cdd9b7d64a16d58395f2b827aa8270f63ab1d77bfeda6687d0d36a2"
         buildkit:
-          - image: ${{ env.BUILDKIT_IMAGE_REF }}
-            desc: ${{ env.BUILDKIT_DESC_REF }}
+          - image: "docker.io/moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
+            desc: "Buildkit (v0.31.0)"
             short: bk0.31.0
-          - image: ${{ env.BUILDKIT_IMAGE_LATEST }}
-            desc: ${{ env.BUILDKIT_DESC_LATEST }}
+          - image: "docker.io/moby/buildkit:latest"
+            desc: "Buildkit (latest)"
             short: bkl
     steps:
       - name: Checkout Repository
@@ -189,7 +185,7 @@ jobs:
         with:
           file: Dockerfile.debian-12
           expected_digest: ${{ matrix.arch.digest }}
-          platforms: ${{ matrix.platforms }}
+          platforms: ${{ matrix.arch.platforms }}
           source_date_epoch: 1677619260
           buildkit_image: ${{ matrix.buildkit.image }}
           runtime: podman

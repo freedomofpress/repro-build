@@ -269,20 +269,19 @@ Rebuilds an image and verifies its digest against an expected value or a target 
 | `tags` | Tags for the image. | |
 | `annotations` | List of annotations to set. | |
 
-When `target_image` is provided, the action compares the reproduced tarball
-against the registry image in two ways:
+When `target_image` is provided, the action fetches the top-level digest of the
+target image with `crane digest` and compares it with the digest of the
+reproduced tarball:
 
-1. It compares the digest of the reproduced OCI index with the top-level digest
-   of the target image. This requires the target image to be a multi-platform
-   image (i.e. an OCI index or Docker manifest list). For a single-platform
-   target, this check is skipped since the registry does not store an index for
-   it.
-2. It compares the digest of each platform manifest in the reproduced tarball
-   with the platform-specific digest of the target image, so that every
-   platform is verified individually.
+* For multi-platform target images (an OCI index or Docker manifest list), it
+  compares the index digest of the reproduced tarball with the index digest of
+  the target image. The `platforms` input must cover all platforms of the
+  target image.
+* For single-platform target images, it compares the manifest digest of the
+  reproduced tarball with the manifest digest of the target image.
 
 Alternatively, pass `expected_digest` to verify the reproduced tarball against a
-known image index digest.
+known digest, e.g. the index digest pinned after the image was first built.
 
 ### Analyze a container image in .tar format
 
@@ -292,7 +291,7 @@ You can inspect the created tarball with:
 $ ./repro-build analyze image.tar
 The OCI tarball contains an index and 1 manifest(s):
 
-Image digest: sha256:f796716b3a176da8739599dc359225e281c3cc77ad10826d68177e11d7983bbd
+Image digest: sha256:056935d8f489b80856a5638f31a585e08f05a935caad4324175363d71f8d5892
 
 Index (index.json):
   Digest: sha256:f796716b3a176da8739599dc359225e281c3cc77ad10826d68177e11d7983bbd
@@ -307,14 +306,23 @@ Manifest 1 (blobs/sha256/056935d8f489b80856a5638f31a585e08f05a935caad4324175363d
   Contents: {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:4427deb8ccbd769872bfb6fd206131d58b2a0f41ba9052247094d521e8a55e1a","size":210},"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"sha256:272adeccafe73e7009d51f2ec2be9871db5e0eb14239f483ea429be26c3c6402","size":45}]}
 ```
 
-The top-level digest of the tarball (the `Image digest` line above) is the digest
-of the OCI index. For multi-platform images, this is the digest you see on your
-container registry, e.g. with `crane digest <image>`. You can verify that a
-tarball matches an expected digest with:
+The `Image digest` line reports the digest that the registry would report for
+this image:
+
+* For a single-platform tarball, the digest of the platform manifest, which is
+  what a registry reports for an image pushed as a single manifest.
+* For a multi-platform tarball, the digest of the OCI index, which is what you
+  see on your container registry, e.g. with `crane digest <image>`. The
+  annotations that BuildKit adds to the platform descriptors of the local
+  tarball (e.g. `org.opencontainers.image.created`) are stripped before
+  hashing, since they are not present on the index that BuildKit pushes to a
+  registry.
+
+You can verify that a tarball matches an expected digest with:
 
 ```console
-$ ./repro-build analyze --expected-image-digest sha256:f796716b3a176da8739599dc359225e281c3cc77ad10826d68177e11d7983bbd image.tar
-✅ Image digest matches f796716b3a176da8739599dc359225e281c3cc77ad10826d68177e11d7983bbd
+$ ./repro-build analyze --expected-image-digest sha256:056935d8f489b80856a5638f31a585e08f05a935caad4324175363d71f8d5892 image.tar
+✅ Image digest matches 056935d8f489b80856a5638f31a585e08f05a935caad4324175363d71f8d5892
 ```
 
 `--expected-image-digest` accepts a digest either with or without the `sha256:`
@@ -331,8 +339,10 @@ multi-platform tarballs.
 Pros and cons of `oci` exporter:
 * :+1: You can build multi-platform tarballs, which you can load with Podman.
 * :+1: The index digest of the produced tarball matches the one that BuildKit
-  produces when pushing a multi-platform image to a registry, so you can compare
-  local digests with remote ones.
+  produces when pushing a multi-platform image to a registry (modulo the
+  annotations BuildKit adds to the descriptors of the local tarball, which
+  `repro-build analyze` strips before hashing), so you can compare local
+  digests with remote ones.
 * :-1: On Docker, `docker load` can only consume such tarballs if the daemon uses
   the containerd image store. This is opt-in on Docker Engine 25.x-28.x, and the
   default on fresh Docker Engine 29.0+ installations. See
@@ -363,9 +373,9 @@ $ ./repro-build build --sde 0 --platform linux/amd64,linux/arm64 .
 ```
 
 The produced tarball contains a single OCI index with one manifest per platform.
-This index is identical to the one BuildKit pushes to a registry for a
-multi-platform image, which means its digest matches the digest you get from the
-registry, e.g.:
+This index matches the one BuildKit pushes to a registry for a multi-platform
+image, which means its digest matches the digest you get from the registry,
+e.g.:
 
 ```console
 $ crane digest ghcr.io/your-org/your-image:tag
