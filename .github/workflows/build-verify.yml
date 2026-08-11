@@ -30,6 +30,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Compute image parameters
         id: params
         run: |
@@ -60,7 +63,7 @@ jobs:
           cache: true
 
   repro-verify:
-    name: Verify ${{ matrix.image.distro }} / ${{ matrix.image.base }} / ${{ matrix.platform }} / ${{ matrix.buildkit.desc }}
+    name: Verify ${{ matrix.image.distro }} / ${{ matrix.image.base }} / ${{ matrix.buildkit.desc }}
     needs: repro-build-push
     runs-on: ubuntu-24.04
     strategy:
@@ -73,9 +76,6 @@ jobs:
           - distro: debian
             version: bookworm
             base: bookworm-20260112-slim
-        platform:
-          - linux/amd64
-          - linux/arm64
         buildkit:
           - image: "docker.io/moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
             desc: "Buildkit (v0.31.0)"
@@ -84,6 +84,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Compute image parameters
         id: params
@@ -100,7 +103,7 @@ jobs:
         with:
           target_image: ${{ steps.params.outputs.tag }}
           file: Dockerfile.${{ matrix.image.distro }}
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64,linux/arm64
           buildkit_image: ${{ matrix.buildkit.image }}
           source_date_epoch: ${{ steps.params.outputs.source_date_epoch }}
           build-args: DEBIAN_IMAGE_TAG=${{ matrix.image.base }}

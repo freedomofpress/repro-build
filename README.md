@@ -126,7 +126,7 @@ Docker-only arguments:
 
 2025-02-24 09:17:48 - DEBUG - Running: docker buildx create --name repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056 --driver-opt image=moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1
 ERROR: existing instance for "repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056" but no append mode, specify the node name to make changes for existing instances
-2025-02-24 09:17:48 - DEBUG - Running: docker buildx --builder repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056 build --build-arg SOURCE_DATE_EPOCH=0 --provenance false --output type=docker,dest=/Users/alex.p/repro-build/image.tar,rewrite-timestamp=true /Users/alex.p/repro-build
+2025-02-24 09:17:48 - DEBUG - Running: docker buildx --builder repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056 build --build-arg SOURCE_DATE_EPOCH=0 --provenance false --output type=oci,dest=/Users/alex.p/repro-build/image.tar,rewrite-timestamp=true /Users/alex.p/repro-build
 [+] Building 81.6s (7/7) FINISHED                                                                                                               docker-container:repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f501a97a8fee73eeb935538a056
  => [internal] load build definition from Dockerfile                                                                                                                                                                                     0.0s
  => => transferring dockerfile: 522B                                                                                                                                                                                                     0.0s
@@ -138,7 +138,7 @@ ERROR: existing instance for "repro-build-6eb8a59ad67f3a251f19d5abdd82689923fe4f
  => CACHED [stage-0 1/2] FROM docker.io/library/debian:bookworm-20230904-slim@sha256:050f00e86cc4d928b21de66096126fac52c2ea47885c232932b2e4c00f0c116d                                                                                    0.0s
  => => resolve docker.io/library/debian:bookworm-20230904-slim@sha256:050f00e86cc4d928b21de66096126fac52c2ea47885c232932b2e4c00f0c116d                                                                                                   0.0s
  => [stage-0 2/2] RUN   --mount=type=cache,target=/var/cache/apt,sharing=locked   --mount=type=cache,target=/var/lib/apt,sharing=locked   --mount=type=bind,source=./repro-sources-list.sh,target=/usr/local/bin/repro-sources-list.sh  70.1s
- => exporting to docker image format                                                                                                                                                                                                    11.0s
+ => exporting to OCI image format                                                                                                                                                                                                    11.0s
  => => exporting layers                                                                                                                                                                                                                  5.1s
  => => rewriting layers with source-date-epoch 0 (1970-01-01 00:00:00 +0000 UTC)                                                                                                                                                         5.2s
  => => exporting manifest sha256:d2ed9626c60a7ea2b774b1e268ba74f1839de34808ed32ff99f9f7facde4de0b                                                                                                                                        0.0s
@@ -178,7 +178,7 @@ $ uvx repro-build build --sde 0 .
 This repository provides two GitHub Actions to help you build and verify
 reproducible images.
 
-#### Reproducible build action (`freedomofpress/repro-build@1.0.0`)
+#### Reproducible build action (`freedomofpress/repro-build@2.0.0`)
 
 This action builds a container image reproducibly using Docker Buildx and the
 standard `docker/build-push-action`. It is a wrapper that handles
@@ -189,7 +189,7 @@ option is set.
 
 ```yaml
 - name: Reproducibly build and push image
-  uses: freedomofpress/repro-build@1.0.0
+  uses: freedomofpress/repro-build@2.0.0
   with:
     tags: ghcr.io/my-org/my-image:latest
     file: Dockerfile
@@ -235,7 +235,7 @@ option is set.
 | `digest` | Image digest. |
 | `metadata` | Build metadata. |
 
-#### Reproduce and verify action (`freedomofpress/repro-build/verify@1.0.0`)
+#### Reproduce and verify action (`freedomofpress/repro-build/verify@2.0.0`)
 
 Rebuilds an image and verifies its digest against an expected value or a target image.
 
@@ -243,11 +243,11 @@ Rebuilds an image and verifies its digest against an expected value or a target 
 
 ```yaml
 - name: Verify image reproducibility
-  uses: freedomofpress/repro-build/verify@1.0.0
+  uses: freedomofpress/repro-build/verify@2.0.0
   with:
     target_image: ghcr.io/my-org/my-image:latest
     file: Dockerfile
-    platforms: linux/amd64
+    platforms: linux/amd64,linux/arm64
     source_date_epoch: 1677619260
     runtime: podman
 ```
@@ -256,11 +256,11 @@ Rebuilds an image and verifies its digest against an expected value or a target 
 
 | Name | Description | Default |
 |------|-------------|---------|
-| `expected_digest` | Expected image digest (e.g., `sha256:...`). | |
-| `target_image` | Image to fetch digest from for verification. | |
+| `expected_digest` | Expected image index digest (e.g., `sha256:...`). | |
+| `target_image` | Image to fetch the digest from for verification. | |
 | `file` | Path to the Dockerfile. | `Dockerfile` |
 | `context` | Build context. | `.` |
-| `platforms` | Target platform (e.g., `linux/amd64`). | `linux/amd64` |
+| `platforms` | Platforms to build (comma-separated). Must cover all platforms of the target image to verify its index digest. | `linux/amd64` |
 | `buildkit_image` | BuildKit image to use. | `moby/buildkit:v0.31.0@...` |
 | `runtime` | Container runtime (`docker` or `podman`). | `podman` |
 | `source_date_epoch` | `SOURCE_DATE_EPOCH` value. | |
@@ -268,6 +268,21 @@ Rebuilds an image and verifies its digest against an expected value or a target 
 | `output` | Path to save the image tarball. | `/tmp/image.tar` |
 | `tags` | Tags for the image. | |
 | `annotations` | List of annotations to set. | |
+
+When `target_image` is provided, the action compares the reproduced tarball
+against the registry image in two ways:
+
+1. It compares the digest of the reproduced OCI index with the top-level digest
+   of the target image. This requires the target image to be a multi-platform
+   image (i.e. an OCI index or Docker manifest list). For a single-platform
+   target, this check is skipped since the registry does not store an index for
+   it.
+2. It compares the digest of each platform manifest in the reproduced tarball
+   with the platform-specific digest of the target image, so that every
+   platform is verified individually.
+
+Alternatively, pass `expected_digest` to verify the reproduced tarball against a
+known image index digest.
 
 ### Analyze a container image in .tar format
 
@@ -277,41 +292,61 @@ You can inspect the created tarball with:
 $ ./repro-build analyze image.tar
 The OCI tarball contains an index and 1 manifest(s):
 
-Image digest: sha256:d2ed9626c60a7ea2b774b1e268ba74f1839de34808ed32ff99f9f7facde4de0b
+Image digest: sha256:f796716b3a176da8739599dc359225e281c3cc77ad10826d68177e11d7983bbd
 
 Index (index.json):
-  Digest: sha256:e609199e7b564eba29ee3ccaa8509fed8c62a8ac91ee5caba46c9c0dc0ed6129
+  Digest: sha256:f796716b3a176da8739599dc359225e281c3cc77ad10826d68177e11d7983bbd
   Media type: application/vnd.oci.image.index.v1+json
   Platform: -
-  Contents: {"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","digest":"sha256:d2ed9626c60a7ea2b774b1e268ba74f1839de34808ed32ff99f9f7facde4de0b","size":703,"annotations":{"org.opencontainers.image.created":"1970-01-01T00:00:00Z"},"platform":{"architecture":"arm64","os":"linux"}}]}
+  Contents: {"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"sha256:056935d8f489b80856a5638f31a585e08f05a935caad4324175363d71f8d5892","size":400,"annotations":{"org.opencontainers.image.created":"1970-01-01T00:00:00Z"},"platform":{"architecture":"arm64","os":"linux"}}]}
 
-Manifest 1 (blobs/sha256/d2ed9626c60a7ea2b774b1e268ba74f1839de34808ed32ff99f9f7facde4de0b):
-  Digest: sha256:d2ed9626c60a7ea2b774b1e268ba74f1839de34808ed32ff99f9f7facde4de0b
-  Media type: application/vnd.docker.distribution.manifest.v2+json
+Manifest 1 (blobs/sha256/056935d8f489b80856a5638f31a585e08f05a935caad4324175363d71f8d5892):
+  Digest: sha256:056935d8f489b80856a5638f31a585e08f05a935caad4324175363d71f8d5892
+  Media type: application/vnd.oci.image.manifest.v1+json
   Platform: linux/arm64
-  Contents: {  "schemaVersion": 2,  "mediaType": "application/vnd.docker.distribution.manifest.v2+json",  "config": {    "mediaType": "application/vnd.docker.container.image.v1+json",    "digest": "sha256:b1fbf0683ddec2760c7cc4fada2cff4a28a6654958902ba42e6fc58295ead88e",    "size": 1165  },  "layers": [    {      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",      "digest": "sha256:155eab17d86c47443adc8cebe7fc62c847c03db8cfb1ca53aa6276564fff23ef",      "size": 29157149    },    {      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",      "digest": "sha256:7914d3c3eb039f  [... 83 characters omitted. Pass --show-contents to print them in their entirety]
+  Contents: {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:4427deb8ccbd769872bfb6fd206131d58b2a0f41ba9052247094d521e8a55e1a","size":210},"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"sha256:272adeccafe73e7009d51f2ec2be9871db5e0eb14239f483ea429be26c3c6402","size":45}]}
 ```
+
+The top-level digest of the tarball (the `Image digest` line above) is the digest
+of the OCI index. For multi-platform images, this is the digest you see on your
+container registry, e.g. with `crane digest <image>`. You can verify that a
+tarball matches an expected digest with:
+
+```console
+$ ./repro-build analyze --expected-image-digest sha256:f796716b3a176da8739599dc359225e281c3cc77ad10826d68177e11d7983bbd image.tar
+✅ Image digest matches f796716b3a176da8739599dc359225e281c3cc77ad10826d68177e11d7983bbd
+```
+
+`--expected-image-digest` accepts a digest either with or without the `sha256:`
+prefix, and works for both single-platform and multi-platform tarballs.
 
 ## Tarball format
 
 By default, `repro-build` uses the
-[`docker` exporter](https://docs.docker.com/build/exporters/) when creating an
-image tarball.
-
-Pros and cons of `docker` exporter:
-* :+1: The image manifest produced by the `docker` exporter matches the one that
-  BuildKit produces when pushing an image to a Docker Registry. In layman terms,
-  this means that the `docker` exporter allows you to compare local digests with
-  remote ones.
-* :-1: You cannot build multi-platform tarballs
+[`oci` exporter](https://docs.docker.com/build/exporters/) when creating an
+image tarball. Since BuildKit v0.31.0, this exporter produces an OCI image
+layout with OCI media types, and it is the only exporter that supports
+multi-platform tarballs.
 
 Pros and cons of `oci` exporter:
-* :+1: You can build multi-platform tarballs, which you can load with Podman
-* :-1: Tarballs in `oci` format cannot be consumed by `docker load`
+* :+1: You can build multi-platform tarballs, which you can load with Podman.
+* :+1: The index digest of the produced tarball matches the one that BuildKit
+  produces when pushing a multi-platform image to a registry, so you can compare
+  local digests with remote ones.
+* :-1: On Docker, `docker load` can only consume such tarballs if the daemon uses
+  the containerd image store. This is opt-in on Docker Engine 25.x-28.x, and the
+  default on fresh Docker Engine 29.0+ installations. See
+  [the Docker docs](https://docs.docker.com/engine/storage/containerd/).
 
-We feel it's more important to compare local digests with remote ones, as well
-as load the container image with `docker load`, so we prefer to use the `docker
-load` exporter.
+Pros and cons of `docker` exporter:
+* :+1: The produced tarball can be loaded by `docker load` with the classic
+  (graphdriver) storage driver.
+* :-1: You cannot build multi-platform tarballs.
+
+We feel it's more important to be able to reproduce the exact image we push to a
+registry, including its index, so we prefer to use the `oci` exporter. If you
+want to load the produced tarball with `docker load`, make sure your Docker
+daemon uses the containerd image store, or use Podman instead.
 
 ## Multi-platform images
 
@@ -319,11 +354,27 @@ If you are on macOS / Windows, the easiest way to build multi-platform images is
 via Docker, which has built-in BuildKit support. Any other option may require
 nested virtualization to work.
 
-The `docker` exporter that `repro-build` uses under the hood does not support
-multi-platform images. You are advised to create a tarball per architecture, if
-you want to reproduce an image.
+`repro-build` uses the `oci` exporter, which supports multi-platform images. To
+build for multiple platforms at once, pass a comma-separated list to
+`--platform`:
 
-If you want to build and push an image, it's best to swap `type=docker` with
+```console
+$ ./repro-build build --sde 0 --platform linux/amd64,linux/arm64 .
+```
+
+The produced tarball contains a single OCI index with one manifest per platform.
+This index is identical to the one BuildKit pushes to a registry for a
+multi-platform image, which means its digest matches the digest you get from the
+registry, e.g.:
+
+```console
+$ crane digest ghcr.io/your-org/your-image:tag
+sha256:8f897a5ec81060dea5c8ebfc7ef053f8e56a05d6b3324a67523985f857674808
+$ ./repro-build analyze --expected-image-digest sha256:8f897a5ec81060dea5c8ebfc7ef053f8e56a05d6b3324a67523985f857674808 image.tar
+✅ Image digest matches 8f897a5ec81060dea5c8ebfc7ef053f8e56a05d6b3324a67523985f857674808
+```
+
+If you want to build and push an image, it's best to swap `type=oci` with
 `type=registry` manually. You can try out a build with `./repro-build build
 --dry ...`, and tweak the commands that would have ran.
 

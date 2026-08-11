@@ -104,7 +104,7 @@ def detect_container_runtime() -> str:
 def oci_print_info(parsed: dict, full: bool) -> None:
     print(f"The OCI tarball contains an index and {len(parsed) - 1} manifest(s):")
     print()
-    print(f"Image digest: {parsed[1]['digest']}")
+    print(f"Image digest: {parsed[0]['digest']}")
     for i, info in enumerate(parsed):
         print()
         if i == 0:
@@ -283,6 +283,9 @@ class Builder:
         return int(d.timestamp())
 
     def _resolve_buildkit_image(self, buildkit_image: str, rootless: bool, runtime: str) -> str:
+        if not buildkit_image:
+            buildkit_image = DEFAULT_BUILDKIT_IMAGE
+
         if rootless and not buildkit_image.startswith("docker.io/"):
             buildkit_image = "docker.io/" + buildkit_image
 
@@ -390,7 +393,7 @@ class Builder:
             f"build-arg:SOURCE_DATE_EPOCH={self.source_date_epoch}",
             *_build_args,
             "--output",
-            f"type=docker,dest=/tmp/image/{self.output.name},rewrite-timestamp=true{tag_args}{annotation_args}",
+            f"type=oci,dest=/tmp/image/{self.output.name},rewrite-timestamp=true{tag_args}{annotation_args}",
             *cache_args,
             *dockerfile_args_buildkit,
             *platform_args,
@@ -442,7 +445,7 @@ class Builder:
             "--provenance",
             "false",
             "--output",
-            f"type=docker,dest={self.output},rewrite-timestamp=true",
+            f"type=oci,dest={self.output},rewrite-timestamp=true",
             *cache_args,
             *tag_args,
             *dockerfile_args,
@@ -518,10 +521,10 @@ def analyze(args) -> None:
     oci_print_info(parsed, args.show_contents)
 
     if expected_image_digest:
-        cur_digest = parsed[1]["digest"].split(":")[1]
+        cur_digest = parsed[0]["digest"].split(":")[1]
         if cur_digest != expected_image_digest:
             raise Exception(
-                f"The image does not have the expected digest: {cur_digest} != {expected_image_digest}"
+                f"The image index does not have the expected digest: {cur_digest} != {expected_image_digest}"
             )
         print(f"✅ Image digest matches {expected_image_digest}")
 
@@ -535,7 +538,8 @@ def analyze_tarball(
 
     Args:
         tarball: Path to the OCI image tarball.
-        expected_image_digest: Optional expected digest to verify against.
+        expected_image_digest: Optional expected image index digest to verify
+            against.
         show_contents: If True, print full file contents.
 
     Returns:
@@ -548,10 +552,10 @@ def analyze_tarball(
     if expected_image_digest:
         if ":" in expected_image_digest:
             expected_image_digest = expected_image_digest.split(":")[1]
-        cur_digest = parsed[1]["digest"].split(":")[1]
+        cur_digest = parsed[0]["digest"].split(":")[1]
         if cur_digest != expected_image_digest:
             raise Exception(
-                f"The image does not have the expected digest: {cur_digest} != {expected_image_digest}"
+                f"The image index does not have the expected digest: {cur_digest} != {expected_image_digest}"
             )
         print(f"✅ Image digest matches {expected_image_digest}")
 
@@ -700,7 +704,7 @@ def parse_args() -> dict:
         "--expected-image-digest",
         metavar="DIGEST",
         default=None,
-        help="The expected digest for the provided image",
+        help="The expected image (index) digest for the provided image",
     )
     analyze_parser.add_argument(
         "--show-contents",
