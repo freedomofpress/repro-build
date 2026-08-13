@@ -29,8 +29,8 @@ ENV_ROOTLESS = "REPRO_ROOTLESS"
 # changes such as new annotations or altered layer sizes. We test against
 # `latest` in CI to detect such regressions early, but never use it as the
 # default. See: https://github.com/freedomofpress/repro-build/issues/3
-DEFAULT_BUILDKIT_IMAGE = "moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
-DEFAULT_BUILDKIT_IMAGE_ROOTLESS = "moby/buildkit:v0.31.0-rootless@sha256:e335bfb48eec12110318aced51f75161f01e765dd13e6041c0f4600b7c93507f"
+DEFAULT_BUILDKIT_IMAGE = "docker.io/moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1"
+DEFAULT_BUILDKIT_IMAGE_ROOTLESS = "docker.io/moby/buildkit:v0.31.0-rootless@sha256:e335bfb48eec12110318aced51f75161f01e765dd13e6041c0f4600b7c93507f"
 
 MSG_BUILD_CTX = """Build environment:
 - Container runtime: {runtime}
@@ -104,7 +104,7 @@ def detect_container_runtime() -> str:
 def oci_print_info(parsed: dict, full: bool) -> None:
     print(f"The OCI tarball contains an index and {len(parsed) - 1} manifest(s):")
     print()
-    print(f"Image digest: {parsed[0]['digest']}")
+    print(f"Image digest: {parsed[1]['digest']}")
     for i, info in enumerate(parsed):
         print()
         if i == 0:
@@ -206,7 +206,7 @@ class Builder:
         runtime: str | None = None,
         source_date_epoch: int | None = None,
         datetime: str | None = None,
-        buildkit_image: str = DEFAULT_BUILDKIT_IMAGE,
+        buildkit_image: str | None = None,
         no_cache: bool = False,
         rootless: bool = False,
         file: str | None = None,
@@ -285,15 +285,12 @@ class Builder:
         return int(d.timestamp())
 
     def _resolve_buildkit_image(
-        self, buildkit_image: str, rootless: bool, runtime: str
+        self, buildkit_image: str | None, rootless: bool, runtime: str
     ) -> str:
-        if rootless and not buildkit_image.startswith("docker.io/"):
-            buildkit_image = "docker.io/" + buildkit_image
-
-        if runtime == "podman" and not buildkit_image.startswith("docker.io/"):
-            buildkit_image = "docker.io/" + buildkit_image
-
-        return buildkit_image
+        default = (
+            DEFAULT_BUILDKIT_IMAGE_ROOTLESS if rootless else DEFAULT_BUILDKIT_IMAGE
+        )
+        return buildkit_image or os.environ.get(ENV_BUILDKIT, default)
 
     def _resolve_buildkit_args(self, buildkit_args: str | None, runtime: str) -> list:
         if not buildkit_args:
@@ -520,7 +517,7 @@ def analyze(args) -> None:
     oci_print_info(parsed, args.show_contents)
 
     if expected_image_digest:
-        cur_digest = parsed[0]["digest"].split(":")[1]
+        cur_digest = parsed[1]["digest"].split(":")[1]
         if cur_digest != expected_image_digest:
             raise Exception(
                 f"The image does not have the expected digest: {cur_digest} != {expected_image_digest}"
@@ -550,7 +547,7 @@ def analyze_tarball(
     if expected_image_digest:
         if ":" in expected_image_digest:
             expected_image_digest = expected_image_digest.split(":")[1]
-        cur_digest = parsed[0]["digest"].split(":")[1]
+        cur_digest = parsed[1]["digest"].split(":")[1]
         if cur_digest != expected_image_digest:
             raise Exception(
                 f"The image does not have the expected digest: {cur_digest} != {expected_image_digest}"

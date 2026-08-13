@@ -312,11 +312,7 @@ this image:
 * For a single-platform tarball, the digest of the platform manifest, which is
   what a registry reports for an image pushed as a single manifest.
 * For a multi-platform tarball, the digest of the OCI index, which is what you
-  see on your container registry, e.g. with `crane digest <image>`. The
-  annotations that BuildKit adds to the platform descriptors of the local
-  tarball (e.g. `org.opencontainers.image.created`) are stripped before
-  hashing, since they are not present on the index that BuildKit pushes to a
-  registry.
+  see on your container registry, e.g. with `crane digest <image>`.
 
 You can verify that a tarball matches an expected digest with:
 
@@ -339,10 +335,8 @@ multi-platform tarballs.
 Pros and cons of `oci` exporter:
 * :+1: You can build multi-platform tarballs, which you can load with Podman.
 * :+1: The index digest of the produced tarball matches the one that BuildKit
-  produces when pushing a multi-platform image to a registry (modulo the
-  annotations BuildKit adds to the descriptors of the local tarball, which
-  `repro-build analyze` strips before hashing), so you can compare local
-  digests with remote ones.
+  produces when pushing a multi-platform image to a registry, so you can
+  compare local digests with remote ones.
 * :-1: On Docker, `docker load` can only consume such tarballs if the daemon uses
   the containerd image store. This is opt-in on Docker Engine 25.x-28.x, and the
   default on fresh Docker Engine 29.0+ installations. See

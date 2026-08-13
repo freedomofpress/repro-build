@@ -21,7 +21,7 @@ jobs:
         arch:
           - suffix: ""
             platforms: "linux/amd64,linux/arm64"
-            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
+            digest: "sha256:fab23b1d46130ff2086e95f412c9604204bdff3b41d5ca0cacbe564887bb5075"
           - suffix: ""
             platforms: "linux/amd64"
             digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
@@ -40,6 +40,18 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+
+      ## `repro-build` emits OCI-layout tarballs, which the classic graphdriver
+      ## store cannot load. Switch the daemon over before it is used for
+      ## anything, since restarting it discards the images of the other store.
+      #- name: Enable the containerd image store
+      #  if: matrix.runtime == 'docker'
+      #  run: |
+      #    sudo mkdir -p /etc/docker
+      #    echo '{"features": {"containerd-snapshotter": true}}' \
+      #      | sudo tee /etc/docker/daemon.json
+      #    sudo systemctl restart docker
+      #    docker info -f '{{ .DriverStatus }}'
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -90,7 +102,7 @@ jobs:
         arch:
           - suffix: ""
             platforms: "linux/amd64,linux/arm64"
-            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
+            digest: "sha256:fab23b1d46130ff2086e95f412c9604204bdff3b41d5ca0cacbe564887bb5075"
           - suffix: ""
             platforms: "linux/amd64"
             digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
@@ -159,7 +171,7 @@ jobs:
         arch:
           - suffix: ""
             platforms: "linux/amd64,linux/arm64"
-            digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
+            digest: "sha256:fab23b1d46130ff2086e95f412c9604204bdff3b41d5ca0cacbe564887bb5075"
           - suffix: ""
             platforms: "linux/amd64"
             digest: "sha256:a9f7f1c5d23c1a6dd72146c060c7dc1cd640920f7ca2f4dc3114e1860d2e1176"
