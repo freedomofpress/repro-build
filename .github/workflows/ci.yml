@@ -41,17 +41,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      ## `repro-build` emits OCI-layout tarballs, which the classic graphdriver
-      ## store cannot load. Switch the daemon over before it is used for
-      ## anything, since restarting it discards the images of the other store.
-      #- name: Enable the containerd image store
-      #  if: matrix.runtime == 'docker'
-      #  run: |
-      #    sudo mkdir -p /etc/docker
-      #    echo '{"features": {"containerd-snapshotter": true}}' \
-      #      | sudo tee /etc/docker/daemon.json
-      #    sudo systemctl restart docker
-      #    docker info -f '{{ .DriverStatus }}'
+      # `repro-build` emits OCI-layout tarballs, which the classic graphdriver
+      # store cannot load. Switch the daemon over before it is used for
+      # anything, since restarting it discards the images of the other store.
+      - name: Set up Docker
+        uses: docker/setup-docker-action@v5
+        with:
+          daemon-config: |
+            {
+              "features": {
+                "containerd-snapshotter": true
+              }
+            }
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
