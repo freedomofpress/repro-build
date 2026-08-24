@@ -38,12 +38,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Install Podman
-        if: matrix.runtime == 'podman'
-        run: |
-          sudo apt update
-          sudo apt install -y podman
-
       - name: Build image
         run: |
           sudo ./repro-build build  \
